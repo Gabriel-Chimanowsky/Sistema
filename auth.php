@@ -8,6 +8,10 @@ function checkAuth() {
     }
 }
 
+function isFinanceiro() {
+    return isset($_SESSION['usuario_login']) && $_SESSION['usuario_login'] === 'Kamilla';
+}
+
 function isLoggedIn() {
     return isset($_SESSION['usuario_id']);
 }

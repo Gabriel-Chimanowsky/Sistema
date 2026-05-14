@@ -20,7 +20,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($usuario && password_verify($senha, $usuario['senha'])) {
         $_SESSION['usuario_id'] = $usuario['id'];
         $_SESSION['usuario_nome'] = $usuario['nome'];
-        header("Location: index.php");
+        $_SESSION['usuario_login'] = $usuario['login'];
+        
+        // Se for a Kamilla, redireciona direto para o financeiro
+        if ($usuario['login'] === 'Kamilla') {
+            header("Location: relatorio.php");
+        } else {
+            header("Location: index.php");
+        }
         exit;
     } else {
         $erro = 'Login ou senha inválidos.';
