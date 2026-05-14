@@ -3,6 +3,11 @@ require_once 'conexao.php';
 require_once 'auth.php';
 checkAuth();
 
+if (isFinanceiro()) {
+    header("Location: relatorio.php");
+    exit;
+}
+
 $stmtPessoas = $pdo->query("SELECT * FROM pessoas ORDER BY nome ASC");
 $pessoas = $stmtPessoas->fetchAll();
 ?>

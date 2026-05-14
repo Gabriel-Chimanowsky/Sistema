@@ -3,6 +3,11 @@ require_once 'conexao.php';
 require_once 'auth.php';
 checkAuth();
 
+if (isFinanceiro()) {
+    header("Location: relatorio.php");
+    exit;
+}
+
 $stmt = $pdo->query("SELECT * FROM configuracoes LIMIT 1");
 $config = $stmt->fetch();
 ?>

@@ -3,6 +3,11 @@ require_once 'conexao.php';
 require_once 'auth.php';
 checkAuth();
 
+if (isFinanceiro()) {
+    header("Location: relatorio.php");
+    exit;
+}
+
 global $apiHerosms, $urlApi;
 $urlApi = 'https://hero-sms.com/stubs/handler_api.php';
 
