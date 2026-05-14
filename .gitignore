@@ -1,0 +1,17 @@
+# PHP
+.env
+.env.local
+.phpintel/
+vendor/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Database
+database_schema.sql
+*.log
+
+# XAMPP/Local stuff
+create_user_temp.php
+update_user_temp.php
