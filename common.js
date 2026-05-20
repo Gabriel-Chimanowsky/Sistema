@@ -10,11 +10,43 @@ function mostrarToast(msg) {
 
 function copiar(txt, msg) {
     if (!txt) return;
-    navigator.clipboard.writeText(txt).then(() => {
-        if (typeof mostrarToast === 'function') mostrarToast(msg);
-        else alert(msg);
-    });
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(txt).then(() => {
+            if (typeof mostrarToast === 'function') mostrarToast(msg);
+            else alert(msg);
+        }).catch(err => {
+            copiarFallback(txt, msg);
+        });
+    } else {
+        copiarFallback(txt, msg);
+    }
 }
+
+function copiarFallback(txt, msg) {
+    const textArea = document.createElement("textarea");
+    textArea.value = txt;
+    // Prevent scrolling on mobile devices
+    textArea.style.top = "0";
+    textArea.style.left = "0";
+    textArea.style.position = "fixed";
+    textArea.style.opacity = "0";
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    try {
+        const successful = document.execCommand('copy');
+        if (successful) {
+            if (typeof mostrarToast === 'function') mostrarToast(msg);
+            else alert(msg);
+        } else {
+            console.error('Fallback: Copy command was unsuccessful');
+        }
+    } catch (err) {
+        console.error('Fallback: Unable to copy', err);
+    }
+    document.body.removeChild(textArea);
+}
+
 
 function mudarStatusMassa() {
     const checks = document.querySelectorAll('.check-conta:checked');

@@ -240,7 +240,7 @@ function linkSort($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
                                         <div class="flex items-center gap-2 text-[10px] font-mono bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg">
                                             <span class="text-indigo-600 font-bold uppercase">CK:</span>
                                             <span class="truncate w-20">Salvo</span>
-                                            <button onclick="copiar(this.closest('tr').dataset.json.cookies, 'Cookies copiados')" class="ml-auto"><i data-lucide="copy" class="w-3 h-3"></i></button>
+                                            <button onclick="copiar(JSON.parse(this.closest('tr').dataset.json).cookies, 'Cookies copiados')" class="ml-auto"><i data-lucide="copy" class="w-3 h-3"></i></button>
                                         </div>
                                     <?php else: ?>
                                         <button onclick="toggleEditCookies(<?= $conta['id'] ?>)" class="text-[10px] font-bold text-slate-500 hover:underline">+ Colar Cookies</button>
