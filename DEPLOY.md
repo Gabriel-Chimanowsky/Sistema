@@ -80,10 +80,10 @@ systemctl start docker
 Como o seu repositório é **público**, você não precisa configurar chaves SSH ou tokens na VPS! A clonagem é feita de forma extremamente simples e direta por HTTPS.
 
 ### A. Clonar o repositório:
-Recomendamos clonar o projeto na pasta `/opt/sistema` para evitar qualquer conflito com sistemas que você já possua rodando em `/var/www/`.
+Criaremos uma nova pasta chamada `/var/www/sistema` para manter o projeto isolado, sem interferir nos seus outros sistemas que já estão dentro de `/var/www/`.
 
 ```bash
-cd /opt
+cd /var/www
 git clone https://github.com/Gabriel-Chimanowsky/Sistema.git sistema
 cd sistema
 ```
