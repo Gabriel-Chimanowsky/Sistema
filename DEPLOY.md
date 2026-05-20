@@ -118,7 +118,7 @@ O Docker irá baixar as imagens do PHP e MariaDB, construir a sua imagem persona
 docker compose ps
 ```
 
-O sistema estará ativo localmente na porta `8082` da sua VPS Contabo.
+O sistema estará ativo localmente na porta `8081` da sua VPS Contabo.
 
 ---
 
@@ -154,8 +154,8 @@ Se o Apache já estiver instalado na VPS, basta criar um novo arquivo de "Virtua
        ServerName sistema.seudominio.com
 
        ProxyPreserveHost On
-       ProxyPass / http://127.0.0.1:8082/
-       ProxyPassReverse / http://127.0.0.1:8082/
+       ProxyPass / http://127.0.0.1:8081/
+       ProxyPassReverse / http://127.0.0.1:8081/
 
        ErrorLog ${APACHE_LOG_DIR}/sistema-error.log
        CustomLog ${APACHE_LOG_DIR}/sistema-access.log combined
@@ -192,7 +192,7 @@ Se a sua VPS já estiver rodando Nginx para os outros sistemas, **NÃO use `apt 
        server_name sistema.seudominio.com;
 
        location / {
-           proxy_pass http://127.0.0.1:8082;
+           proxy_pass http://127.0.0.1:8081;
            proxy_set_header Host $host;
            proxy_set_header X-Real-IP $remote_addr;
            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
