@@ -80,8 +80,10 @@ systemctl start docker
 Como o seu repositório é **público**, você não precisa configurar chaves SSH ou tokens na VPS! A clonagem é feita de forma extremamente simples e direta por HTTPS.
 
 ### A. Clonar o repositório:
+Recomendamos clonar o projeto na pasta `/opt/sistema` para evitar qualquer conflito com sistemas que você já possua rodando em `/var/www/`.
+
 ```bash
-cd /var
+cd /opt
 git clone https://github.com/Gabriel-Chimanowsky/Sistema.git sistema
 cd sistema
 ```
@@ -120,49 +122,95 @@ O sistema estará ativo localmente na porta `8080` da sua VPS Contabo.
 
 ---
 
-## 7. Configuração de HTTPS / SSL Grátis (Opcional & Recomendado)
+## 7. Configuração de HTTPS / SSL Grátis (Sem derrubar seus outros sistemas!)
 
-Para que seu sistema seja acessado de forma segura através do seu domínio (ex: `sistema.seudominio.com`) utilizando HTTPS, configure o **Nginx** como proxy reverso e use o **Certbot** para gerar o certificado SSL grátis da Let's Encrypt.
+Como a sua VPS já possui outros sistemas rodando em `/var/www/`, você **provavelmente já tem um servidor Web (Apache ou Nginx) instalado** respondendo nas portas `80` e `443`.
 
-### A. Instalar o Nginx e Certbot na VPS:
-```bash
-apt install -y nginx certbot python3-certbot-nginx
-```
+> [!CAUTION]
+> **NÃO instale outro servidor Web se já houver um rodando!** Se você instalar o Nginx por cima de um Apache existente, por exemplo, ele tentará usar a mesma porta e poderá derrubar todos os seus sites que estão no ar.
 
-### B. Configurar o Nginx:
-Crie um arquivo de configuração para o seu domínio:
-```bash
-nano /etc/nginx/sites-available/sistema
-```
+Abaixo, veja como configurar a integração dependendo do servidor que você já usa:
 
-Cole o seguinte conteúdo (substitua `sistema.seudominio.com` pelo seu domínio real apontado para a VPS):
+---
 
-```nginx
-server {
-    listen 80;
-    server_name sistema.seudominio.com;
+### OPÇÃO A: Se a sua VPS usa APACHE (Mais comum para sites em `/var/www/`)
 
-    location / {
-        proxy_pass http://127.0.0.1:8080;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-```
+Se o Apache já estiver instalado na VPS, basta criar um novo arquivo de "Virtual Host" para o seu domínio do sistema:
 
-Ative o site e reinicie o Nginx:
-```bash
-ln -s /etc/nginx/sites-available/sistema /etc/nginx/sites-enabled/
-nginx -t
-systemctl restart nginx
-```
+1. **Ativar os módulos de proxy do Apache (caso ainda não estejam ativos):**
+   ```bash
+   a2enmod proxy proxy_http
+   systemctl restart apache2
+   ```
 
-### C. Gerar o Certificado SSL HTTPS Grátis:
-Execute o comando abaixo e siga as instruções na tela. O Certbot irá configurar o SSL automaticamente no seu arquivo do Nginx!
-```bash
-certbot --nginx -d sistema.seudominio.com
-```
+2. **Criar a configuração do novo site:**
+   ```bash
+   nano /etc/apache2/sites-available/sistema.conf
+   ```
 
-Pronto! Seu sistema agora está rodando de forma profissional, segura (HTTPS) e de fácil manutenção direto na sua VPS Contabo! 🚀
+3. **Coloque o seguinte conteúdo** (substitua `sistema.seudominio.com` pelo seu domínio real):
+   ```apache
+   <VirtualHost *:80>
+       ServerName sistema.seudominio.com
+
+       ProxyPreserveHost On
+       ProxyPass / http://127.0.0.1:8080/
+       ProxyPassReverse / http://127.0.0.1:8080/
+
+       ErrorLog ${APACHE_LOG_DIR}/sistema-error.log
+       CustomLog ${APACHE_LOG_DIR}/sistema-access.log combined
+   </VirtualHost>
+   ```
+
+4. **Ativar o site e recarregar o Apache:**
+   ```bash
+   a2ensite sistema.conf
+   systemctl reload apache2
+   ```
+
+5. **Gerar SSL com Certbot para Apache:**
+   ```bash
+   # Caso não tenha o certbot para Apache: apt install -y python3-certbot-apache
+   certbot --apache -d sistema.seudominio.com
+   ```
+
+---
+
+### OPÇÃO B: Se a sua VPS usa NGINX
+
+Se a sua VPS já estiver rodando Nginx para os outros sistemas, **NÃO use `apt install nginx`**. Apenas adicione um novo bloco de servidor:
+
+1. **Criar a configuração:**
+   ```bash
+   nano /etc/nginx/sites-available/sistema
+   ```
+
+2. **Coloque o seguinte conteúdo:**
+   ```nginx
+   server {
+       listen 80;
+       server_name sistema.seudominio.com;
+
+       location / {
+           proxy_pass http://127.0.0.1:8080;
+           proxy_set_header Host $host;
+           proxy_set_header X-Real-IP $remote_addr;
+           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+           proxy_set_header X-Forwarded-Proto $scheme;
+       }
+   }
+   ```
+
+3. **Ativar o site e reiniciar o Nginx:**
+   ```bash
+   ln -s /etc/nginx/sites-available/sistema /etc/nginx/sites-enabled/
+   nginx -t
+   systemctl restart nginx
+   ```
+
+4. **Gerar SSL com Certbot para Nginx:**
+   ```bash
+   certbot --nginx -d sistema.seudominio.com
+   ```
+
+Pronto! Seu novo sistema rodará de forma totalmente isolada via Docker, usando o seu servidor web atual como proxy, sem interferir nem colocar em risco nenhum dos seus outros sistemas que já estão online! 🚀
