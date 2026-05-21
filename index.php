@@ -239,8 +239,9 @@ function linkSort($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
                                     <?php if ($conta['cookies']): ?>
                                         <div class="flex items-center gap-2 text-[10px] font-mono bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg">
                                             <span class="text-indigo-600 font-bold uppercase">CK:</span>
-                                            <span class="truncate w-20">Salvo</span>
-                                            <button onclick="copiar(JSON.parse(this.closest('tr').dataset.json).cookies, 'Cookies copiados')" class="ml-auto"><i data-lucide="copy" class="w-3 h-3"></i></button>
+                                            <span class="truncate w-12">Salvo</span>
+                                            <button onclick="toggleEditCookies(<?= $conta['id'] ?>)" class="text-slate-500 hover:text-blue-500 ml-auto" title="Editar Cookies"><i data-lucide="edit-3" class="w-3 h-3"></i></button>
+                                            <button onclick="copiar(JSON.parse(this.closest('tr').dataset.json).cookies, 'Cookies copiados')"><i data-lucide="copy" class="w-3 h-3"></i></button>
                                         </div>
                                     <?php else: ?>
                                         <button onclick="toggleEditCookies(<?= $conta['id'] ?>)" class="text-[10px] font-bold text-slate-500 hover:underline">+ Colar Cookies</button>
@@ -257,6 +258,25 @@ function linkSort($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
                                         <div class="flex gap-2">
                                             <button type="submit" class="flex-1 bg-blue-600 text-white py-1.5 rounded-lg text-xs font-bold">Salvar</button>
                                             <button type="button" onclick="toggleEdit2FA(<?= $conta['id'] ?>)" class="px-3 bg-slate-100 dark:bg-slate-700 rounded-lg text-xs font-bold">X</button>
+                                        </div>
+                                    </form>
+                                </div>
+
+                                <!-- Edit Cookies Popover (Hidden by default) -->
+                                <div id="edit-cookies-<?= $conta['id'] ?>" class="hidden absolute z-10 bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 mt-2 w-80 shadow-indigo-500/10">
+                                    <form method="POST" action="processa.php" class="space-y-3">
+                                        <input type="hidden" name="acao" value="salvar_cookies">
+                                        <input type="hidden" name="conta_id" value="<?= $conta['id'] ?>">
+                                        <div class="flex justify-between items-center">
+                                            <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Cookies</span>
+                                            <button type="button" onclick="copiarDoClipboard(<?= $conta['id'] ?>)" class="text-[10px] font-bold text-blue-500 hover:underline flex items-center gap-1">
+                                                <i data-lucide="clipboard" class="w-3 h-3"></i> Colar Clipboard
+                                            </button>
+                                        </div>
+                                        <textarea name="cookies" id="textarea-cookies-<?= $conta['id'] ?>" rows="4" placeholder="Cole os cookies em formato JSON..." class="w-full text-xs p-2 rounded-lg border dark:bg-slate-900 outline-none resize-none font-mono custom-scrollbar border-slate-200 dark:border-slate-700"></textarea>
+                                        <div class="flex gap-2">
+                                            <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-1.5 rounded-lg text-xs font-bold transition">Salvar</button>
+                                            <button type="button" onclick="toggleEditCookies(<?= $conta['id'] ?>)" class="px-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-650 rounded-lg text-xs font-bold transition">X</button>
                                         </div>
                                     </form>
                                 </div>
@@ -480,6 +500,61 @@ function linkSort($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
         function toggleEdit2FA(id) {
             const el = document.getElementById('edit-2fa-' + id);
             el.classList.toggle('hidden');
+        }
+
+        async function toggleEditCookies(id) {
+            const el = document.getElementById('edit-cookies-' + id);
+            if (!el) return;
+            el.classList.toggle('hidden');
+            
+            if (!el.classList.contains('hidden')) {
+                const textarea = document.getElementById('textarea-cookies-' + id);
+                if (textarea) {
+                    // Prefill with existing cookies
+                    const tr = document.querySelector(`tr[data-id="${id}"]`);
+                    let existingCookies = '';
+                    if (tr && tr.dataset.json) {
+                        try {
+                            const data = JSON.parse(tr.dataset.json);
+                            if (data.cookies) {
+                                existingCookies = data.cookies;
+                            }
+                        } catch (e) {}
+                    }
+                    if (existingCookies) {
+                        textarea.value = existingCookies;
+                    }
+                    
+                    // Auto-paste from clipboard if available
+                    try {
+                        const text = await navigator.clipboard.readText();
+                        if (text && text.trim()) {
+                            textarea.value = text.trim();
+                            mostrarToast('Área de transferência colada automaticamente!');
+                        }
+                    } catch (err) {
+                        console.log('Clipboard access denied or unsupported:', err);
+                    }
+                    textarea.focus();
+                }
+            }
+        }
+
+        async function copiarDoClipboard(id) {
+            const textarea = document.getElementById('textarea-cookies-' + id);
+            if (textarea) {
+                try {
+                    const text = await navigator.clipboard.readText();
+                    if (text && text.trim()) {
+                        textarea.value = text.trim();
+                        mostrarToast('Colado da área de transferência!');
+                    } else {
+                        mostrarToast('Área de transferência vazia.');
+                    }
+                } catch (err) {
+                    mostrarToast('Erro ao acessar área de transferência.');
+                }
+            }
         }
 
         let formAlvo = null;
