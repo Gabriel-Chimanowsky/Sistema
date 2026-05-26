@@ -44,15 +44,41 @@ try {
     $sobrenomeLimpo = iconv('UTF-8', 'ASCII//TRANSLIT', strtolower($sobrenome));
     $username = preg_replace('/[^a-z0-9]/', '', $nomeLimpo) . '-' . preg_replace('/[^a-z0-9]/', '', $sobrenomeLimpo);
 
-    $email = $config['email_prefixo'] . $config['email_contador'] . $config['email_dominio'];
-    $senhaPadrao = $config['senha_padrao'];
+    // Busca um e-mail único verificando existência no banco e tratando concorrência
+    $emailValido = false;
+    while (!$emailValido) {
+        $email = $config['email_prefixo'] . $config['email_contador'] . $config['email_dominio'];
 
-    $sql = "INSERT INTO contas (nome, sobrenome, username, email, senha, genero, pais, status) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'pendente')";
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute([$nome, $sobrenome, $username, $email, $senhaPadrao, $genero, $pais]);
+        $stmtCheck = $pdo->prepare("SELECT COUNT(*) FROM contas WHERE email = ?");
+        $stmtCheck->execute([$email]);
+        $existe = $stmtCheck->fetchColumn() > 0;
 
-    $pdo->query("UPDATE configuracoes SET email_contador = email_contador + 1");
+        if ($existe) {
+            $config['email_contador']++;
+            $pdo->query("UPDATE configuracoes SET email_contador = email_contador + 1");
+            continue;
+        }
+
+        try {
+            $senhaPadrao = $config['senha_padrao'];
+
+            $sql = "INSERT INTO contas (nome, sobrenome, username, email, senha, genero, pais, status) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, 'pendente')";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([$nome, $sobrenome, $username, $email, $senhaPadrao, $genero, $pais]);
+
+            $pdo->query("UPDATE configuracoes SET email_contador = email_contador + 1");
+            $emailValido = true;
+        } catch (PDOException $e) {
+            if ($e->getCode() == 23000) {
+                // Caso ocorra colisão por concorrência de requests, incrementa e continua a busca
+                $config['email_contador']++;
+                $pdo->query("UPDATE configuracoes SET email_contador = email_contador + 1");
+            } else {
+                throw $e;
+            }
+        }
+    }
 
     echo json_encode([
         "sucesso" => true,

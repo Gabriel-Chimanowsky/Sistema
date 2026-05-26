@@ -177,12 +177,39 @@ switch ($acao) {
                 $dados = ['nome' => 'User', 'sobrenome' => rand(100, 999), 'username' => 'user-' . rand(1000, 9999)];
             }
 
-            $email = $config['email_prefixo'] . $config['email_contador'] . $config['email_dominio'];
+            $emailValido = false;
+            while (!$emailValido) {
+                $email = $config['email_prefixo'] . $config['email_contador'] . $config['email_dominio'];
 
-            $sql = "INSERT INTO contas (nome, sobrenome, username, email, senha, genero, pais, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'pendente')";
-            $pdo->prepare($sql)->execute([$dados['nome'], $dados['sobrenome'], $dados['username'], $email, $config['senha_padrao'], $genero, $pais]);
-            
-            $pdo->query("UPDATE configuracoes SET email_contador = email_contador + 1");
+                // Verificação de pré-existência no banco de dados
+                $stmtCheck = $pdo->prepare("SELECT COUNT(*) FROM contas WHERE email = ?");
+                $stmtCheck->execute([$email]);
+                $existe = $stmtCheck->fetchColumn() > 0;
+
+                if ($existe) {
+                    $config['email_contador']++;
+                    $pdo->query("UPDATE configuracoes SET email_contador = email_contador + 1");
+                    continue;
+                }
+
+                try {
+                    $sql = "INSERT INTO contas (nome, sobrenome, username, email, senha, genero, pais, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'pendente')";
+                    $pdo->prepare($sql)->execute([$dados['nome'], $dados['sobrenome'], $dados['username'], $email, $config['senha_padrao'], $genero, $pais]);
+                    
+                    // Incrementa para o próximo e-mail de forma bem sucedida
+                    $config['email_contador']++;
+                    $pdo->query("UPDATE configuracoes SET email_contador = email_contador + 1");
+                    $emailValido = true;
+                } catch (PDOException $e) {
+                    // Trata colisões concorrentes (Integrity constraint violation)
+                    if ($e->getCode() == 23000) {
+                        $config['email_contador']++;
+                        $pdo->query("UPDATE configuracoes SET email_contador = email_contador + 1");
+                    } else {
+                        throw $e;
+                    }
+                }
+            }
             
             // Pequeno delay para não sobrecarregar se for muitos
             if ($qtd > 5) usleep(100000); 
