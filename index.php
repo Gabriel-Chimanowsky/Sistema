@@ -76,6 +76,13 @@ $totalContas = $pdo->query("SELECT COUNT(*) FROM contas")->fetchColumn();
 $contasCriadasHoje = $pdo->query("SELECT COUNT(*) FROM contas WHERE DATE(data_criacao) = CURDATE()")->fetchColumn();
 $contasAutenticadas = $pdo->query("SELECT COUNT(*) FROM contas WHERE status IN ('autenticada', 'exportado')")->fetchColumn();
 
+// Novas estatísticas solicitadas pelo usuário
+$contasAdmin = $pdo->query("SELECT COUNT(*) FROM contas WHERE destinada_a IN (SELECT id FROM pessoas WHERE nome LIKE '%administrador%')")->fetchColumn();
+$contasPessoal = $pdo->query("SELECT COUNT(*) FROM contas WHERE destinada_a IS NOT NULL AND destinada_a NOT IN (SELECT id FROM pessoas WHERE nome LIKE '%administrador%')")->fetchColumn();
+$contasLivres = $pdo->query("SELECT COUNT(*) FROM contas WHERE destinada_a IS NULL")->fetchColumn();
+$contasNaoProntas = $pdo->query("SELECT COUNT(*) FROM contas WHERE status IN ('pendente', 'criada')")->fetchColumn();
+
+
 // Listagem
 $sort = $_GET['sort'] ?? 'id';
 $dir = strtoupper($_GET['dir'] ?? 'DESC');
@@ -143,7 +150,7 @@ function linkSort($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
     <main class="max-w-[1600px] mx-auto px-4 mt-24 space-y-6">
         
         <!-- Stats Cards -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div class="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
                 <div>
                     <p class="text-slate-500 text-sm font-semibold uppercase tracking-wider">Total de Contas</p>
@@ -167,8 +174,47 @@ function linkSort($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
                     <p class="text-slate-500 text-sm font-semibold uppercase tracking-wider">Autenticadas</p>
                     <h3 class="text-3xl font-black mt-1"><?= $contasAutenticadas ?></h3>
                 </div>
-                <div class="w-12 h-12 bg-amber-100 dark:bg-amber-900/30 rounded-2xl flex items-center justify-center text-amber-600 dark:text-amber-400">
+                <div class="w-12 h-12 bg-emerald-100 dark:bg-emerald-900/30 rounded-2xl flex items-center justify-center text-emerald-600 dark:text-emerald-400">
                     <i data-lucide="shield-check" class="w-6 h-6"></i>
+                </div>
+            </div>
+            <div class="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-slate-500 text-sm font-semibold uppercase tracking-wider">Pendente / Não Pronta</p>
+                    <h3 class="text-3xl font-black mt-1"><?= $contasNaoProntas ?></h3>
+                </div>
+                <div class="w-12 h-12 bg-amber-100 dark:bg-amber-900/30 rounded-2xl flex items-center justify-center text-amber-600 dark:text-amber-400">
+                    <i data-lucide="clock" class="w-6 h-6"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-slate-500 text-sm font-semibold uppercase tracking-wider">Uso por Pessoal</p>
+                    <h3 class="text-3xl font-black mt-1"><?= $contasPessoal ?></h3>
+                </div>
+                <div class="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-2xl flex items-center justify-center text-purple-600 dark:text-purple-400">
+                    <i data-lucide="user" class="w-6 h-6"></i>
+                </div>
+            </div>
+            <div class="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-slate-500 text-sm font-semibold uppercase tracking-wider">Uso por Administrador</p>
+                    <h3 class="text-3xl font-black mt-1"><?= $contasAdmin ?></h3>
+                </div>
+                <div class="w-12 h-12 bg-indigo-100 dark:bg-indigo-900/30 rounded-2xl flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                    <i data-lucide="shield" class="w-6 h-6"></i>
+                </div>
+            </div>
+            <div class="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-slate-500 text-sm font-semibold uppercase tracking-wider">Contas Livres</p>
+                    <h3 class="text-3xl font-black mt-1"><?= $contasLivres ?></h3>
+                </div>
+                <div class="w-12 h-12 bg-sky-100 dark:bg-sky-900/30 rounded-2xl flex items-center justify-center text-sky-600 dark:text-sky-400">
+                    <i data-lucide="unlock" class="w-6 h-6"></i>
                 </div>
             </div>
         </div>
