@@ -391,39 +391,115 @@ function linkSort($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
     </main>
 
     <!-- Footer Action Bar -->
-    <div class="fixed bottom-0 left-0 w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 p-4 shadow-2xl z-40">
-        <div class="max-w-[1600px] mx-auto flex items-center justify-between gap-4">
-            <div class="flex items-center gap-3 text-slate-400 font-bold text-xs uppercase tracking-widest">
-                <i data-lucide="user-plus" class="w-5 h-5"></i>
-                Gerar Nova Conta
+    <div class="fixed bottom-0 left-0 w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 shadow-2xl z-40">
+        <div class="max-w-[1600px] mx-auto px-4">
+
+            <!-- Barra de seleção em lote (visível quando há checkboxes marcados) -->
+            <div id="barraLote" class="hidden py-3 border-b border-slate-200 dark:border-slate-800">
+                <div class="flex flex-wrap items-center gap-2">
+                    <span id="loteContador" class="text-xs font-black text-blue-600 bg-blue-50 dark:bg-blue-900/30 px-3 py-1.5 rounded-full">0 selecionadas</span>
+                    
+                    <!-- Mudar Status em Lote -->
+                    <form id="formStatusMassa" method="POST" action="processa.php" class="flex items-center gap-1">
+                        <input type="hidden" name="acao" value="mudar_status_massa">
+                        <input type="hidden" name="ids" class="ids-input">
+                        <select name="novo_status" class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold rounded-lg px-2 py-1.5 outline-none cursor-pointer">
+                            <option value="pendente">Pendente</option>
+                            <option value="criada">Criada</option>
+                            <option value="autenticada">Autenticada</option>
+                            <option value="exportado">Exportado</option>
+                        </select>
+                        <button type="submit" onclick="preencherIdsLote(this.closest('form'))" class="bg-slate-700 dark:bg-slate-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:scale-105 transition">
+                            <i data-lucide="check-circle" class="w-3 h-3 inline mr-1"></i>Status
+                        </button>
+                    </form>
+
+                    <div class="w-px h-6 bg-slate-200 dark:bg-slate-700"></div>
+
+                    <!-- Mudar Dono em Lote -->
+                    <form id="formDonaMassa" method="POST" action="processa.php" class="flex items-center gap-1">
+                        <input type="hidden" name="acao" value="vincular_pessoa_massa">
+                        <input type="hidden" name="ids" class="ids-input">
+                        <select name="pessoa_id" class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold rounded-lg px-2 py-1.5 outline-none cursor-pointer">
+                            <option value="">-- Livre --</option>
+                            <?php foreach ($pessoas as $p): ?>
+                                <option value="<?= $p['id'] ?>"><?= htmlspecialchars($p['nome']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <button type="submit" onclick="preencherIdsLote(this.closest('form'))" class="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:scale-105 transition">
+                            <i data-lucide="user-check" class="w-3 h-3 inline mr-1"></i>Dono
+                        </button>
+                    </form>
+
+                    <div class="w-px h-6 bg-slate-200 dark:bg-slate-700"></div>
+
+                    <!-- Regerar em Lote -->
+                    <form id="formRegerarMassa" method="POST" action="processa.php" class="flex items-center">
+                        <input type="hidden" name="acao" value="regerar_massa">
+                        <input type="hidden" name="ids" class="ids-input">
+                        <button type="button" onclick="confirmarAcaoLote('Regerar dados das contas selecionadas?', document.getElementById(\'formRegerarMassa\'))" class="bg-purple-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:scale-105 transition flex items-center gap-1">
+                            <i data-lucide="refresh-cw" class="w-3 h-3"></i>Regerar
+                        </button>
+                    </form>
+
+                    <div class="w-px h-6 bg-slate-200 dark:bg-slate-700"></div>
+
+                    <!-- Deletar em Lote -->
+                    <form id="formDelMassa" method="POST" action="processa.php" class="flex items-center">
+                        <input type="hidden" name="acao" value="del_massa">
+                        <input type="hidden" name="ids" class="ids-input">
+                        <button type="button" onclick="confirmarAcaoLote('Excluir permanentemente as contas selecionadas?', document.getElementById(\'formDelMassa\'))" class="bg-red-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:scale-105 transition flex items-center gap-1">
+                            <i data-lucide="trash-2" class="w-3 h-3"></i>Excluir
+                        </button>
+                    </form>
+
+                    <div class="w-px h-6 bg-slate-200 dark:bg-slate-700"></div>
+
+                    <!-- Exportar em Lote -->
+                    <form id="formExportMassa" method="POST" action="processa.php" class="flex items-center">
+                        <input type="hidden" name="acao" value="exportar_csv">
+                        <input type="hidden" name="ids" class="ids-input">
+                        <button type="submit" onclick="preencherIdsLote(this.closest('form'))" class="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:scale-105 transition flex items-center gap-1">
+                            <i data-lucide="download" class="w-3 h-3"></i>Exportar
+                        </button>
+                    </form>
+                </div>
             </div>
 
-            <form method="POST" action="processa.php" class="flex items-center gap-3">
-                <input type="hidden" name="acao" value="gerar_conta">
-                
-                <div class="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-1 gap-1">
-                    <select name="genero" id="genSelect" onchange="saveSettings()" class="bg-white dark:bg-slate-900 border-none rounded-lg px-3 py-1.5 text-xs font-bold outline-none cursor-pointer shadow-sm">
-                        <option value="homem">👨 Homem</option>
-                        <option value="mulher">👩 Mulher</option>
-                    </select>
-                    <select name="pais" id="paisSelect" onchange="saveSettings()" class="bg-white dark:bg-slate-900 border-none rounded-lg px-3 py-1.5 text-xs font-bold outline-none cursor-pointer shadow-sm">
-                        <option value="br">🇧🇷 Brasil</option>
-                        <option value="us">🇺🇸 EUA</option>
-                    </select>
+            <!-- Barra principal de geração -->
+            <div class="flex items-center justify-between gap-4 py-3">
+                <div class="flex items-center gap-3 text-slate-400 font-bold text-xs uppercase tracking-widest">
+                    <i data-lucide="user-plus" class="w-5 h-5"></i>
+                    Gerar Nova Conta
                 </div>
 
-                <div class="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl px-3 py-1.5 gap-2">
-                    <span class="text-[10px] font-black text-slate-400 uppercase">Qtd:</span>
-                    <input type="number" name="quantidade" value="1" min="1" max="50" class="bg-transparent w-10 text-sm font-bold outline-none text-center">
+                <form method="POST" action="processa.php" class="flex items-center gap-3">
+                    <input type="hidden" name="acao" value="gerar_conta">
+                    
+                    <div class="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-1 gap-1">
+                        <select name="genero" id="genSelect" onchange="saveSettings()" class="bg-white dark:bg-slate-900 border-none rounded-lg px-3 py-1.5 text-xs font-bold outline-none cursor-pointer shadow-sm">
+                            <option value="homem">👨 Homem</option>
+                            <option value="mulher">👩 Mulher</option>
+                        </select>
+                        <select name="pais" id="paisSelect" onchange="saveSettings()" class="bg-white dark:bg-slate-900 border-none rounded-lg px-3 py-1.5 text-xs font-bold outline-none cursor-pointer shadow-sm">
+                            <option value="br">🇧🇷 Brasil</option>
+                            <option value="us">🇺🇸 EUA</option>
+                        </select>
+                    </div>
+
+                    <div class="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl px-3 py-1.5 gap-2">
+                        <span class="text-[10px] font-black text-slate-400 uppercase">Qtd:</span>
+                        <input type="number" name="quantidade" value="1" min="1" max="50" class="bg-transparent w-10 text-sm font-bold outline-none text-center">
+                    </div>
+
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-2 rounded-xl font-black text-sm shadow-xl shadow-blue-600/30 transition-all hover:scale-105 active:scale-95">
+                        GERAR AGORA
+                    </button>
+                </form>
+
+                <div class="hidden lg:block text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                    Facebook Account Manager v4.3
                 </div>
-
-                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-2 rounded-xl font-black text-sm shadow-xl shadow-blue-600/30 transition-all hover:scale-105 active:scale-95">
-                    GERAR AGORA
-                </button>
-            </form>
-
-            <div class="hidden lg:block text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-                Facebook Account Manager v4.3
             </div>
         </div>
     </div>
@@ -453,8 +529,27 @@ function linkSort($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
         if (window.location.search.includes('msg=ok')) {
             setTimeout(() => mostrarToast('Ação realizada com sucesso!'), 300);
         }
-        
-        // Persistence
+
+        // ── Scroll Restore ──────────────────────────────────────────
+        const SCROLL_KEY = 'index_scroll_y';
+        // Restaurar scroll assim que o DOM estiver pronto
+        const savedScroll = sessionStorage.getItem(SCROLL_KEY);
+        if (savedScroll) {
+            requestAnimationFrame(() => {
+                window.scrollTo({ top: parseInt(savedScroll), behavior: 'instant' });
+                sessionStorage.removeItem(SCROLL_KEY);
+            });
+        }
+        // Salvar scroll antes de qualquer submit de form
+        document.addEventListener('submit', () => {
+            sessionStorage.setItem(SCROLL_KEY, window.scrollY);
+        });
+        // Salvar scroll antes de navegar (links de ordenação)
+        document.querySelectorAll('a[href*="sort="]').forEach(a => {
+            a.addEventListener('click', () => sessionStorage.setItem(SCROLL_KEY, window.scrollY));
+        });
+
+        // ── Configurações persistentes ────────────────────────────────
         function saveSettings() {
             localStorage.setItem('dollfinn_gen_genero', document.getElementById('genSelect').value);
             localStorage.setItem('dollfinn_gen_pais', document.getElementById('paisSelect').value);
@@ -466,6 +561,42 @@ function linkSort($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
             if(p) document.getElementById('paisSelect').value = p;
         }
         loadSettings();
+
+        // ── Ações em Lote ─────────────────────────────────────────────
+        function getSelecionados() {
+            return [...document.querySelectorAll('.check-conta:checked')]
+                .map(c => c.closest('tr[data-id]')?.dataset.id)
+                .filter(Boolean);
+        }
+
+        function atualizarBarraLote() {
+            const ids = getSelecionados();
+            const barra = document.getElementById('barraLote');
+            const contador = document.getElementById('loteContador');
+            if (ids.length > 0) {
+                barra.classList.remove('hidden');
+                contador.textContent = `${ids.length} selecionada${ids.length > 1 ? 's' : ''}`;
+            } else {
+                barra.classList.add('hidden');
+            }
+        }
+
+        function preencherIdsLote(form) {
+            const ids = getSelecionados();
+            form.querySelector('.ids-input').value = ids.join(',');
+        }
+
+        function confirmarAcaoLote(txt, form) {
+            preencherIdsLote(form);
+            abrirModal(txt, form);
+        }
+
+        // Observar mudanças nos checkboxes
+        document.addEventListener('change', e => {
+            if (e.target.classList.contains('check-conta') || e.target.id === 'selectAll') {
+                atualizarBarraLote();
+            }
+        });
 
         const smsPedidos = {};
 
@@ -613,6 +744,7 @@ function linkSort($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
 
         document.getElementById('selectAll').addEventListener('change', (e) => {
             document.querySelectorAll('.check-conta').forEach(c => c.checked = e.target.checked);
+            atualizarBarraLote();
         });
     </script>
 </body>

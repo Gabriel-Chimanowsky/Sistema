@@ -100,6 +100,54 @@ switch ($acao) {
         }
         break;
 
+    case 'del_massa':
+        $ids = $_POST['ids'] ?? '';
+        if (!empty($ids)) {
+            $idsArray = array_filter(array_map('intval', explode(',', $ids)));
+            if (count($idsArray) > 0) {
+                $in = str_repeat('?,', count($idsArray) - 1) . '?';
+                $pdo->prepare("DELETE FROM contas WHERE id IN ($in)")->execute($idsArray);
+            }
+        }
+        break;
+
+    case 'vincular_pessoa_massa':
+        $ids = $_POST['ids'] ?? '';
+        $pessoa_id = filter_input(INPUT_POST, 'pessoa_id', FILTER_VALIDATE_INT) ?: null;
+        if (!empty($ids)) {
+            $idsArray = array_filter(array_map('intval', explode(',', $ids)));
+            if (count($idsArray) > 0) {
+                $in = str_repeat('?,', count($idsArray) - 1) . '?';
+                if ($pessoa_id) {
+                    $params = array_merge([$pessoa_id], $idsArray);
+                    $pdo->prepare("UPDATE contas SET destinada_a = ?, data_vinculo = NOW() WHERE id IN ($in)")->execute($params);
+                } else {
+                    $pdo->prepare("UPDATE contas SET destinada_a = NULL, data_vinculo = NULL WHERE id IN ($in)")->execute($idsArray);
+                }
+            }
+        }
+        break;
+
+    case 'regerar_massa':
+        $ids = $_POST['ids'] ?? '';
+        if (!empty($ids)) {
+            $idsArray = array_filter(array_map('intval', explode(',', $ids)));
+            foreach ($idsArray as $rid) {
+                $stmt = $pdo->prepare("SELECT genero, pais FROM contas WHERE id = ?");
+                $stmt->execute([$rid]);
+                $conta = $stmt->fetch();
+                if ($conta) {
+                    $dados = gerarNomeAleatorio($conta['genero'], $conta['pais']);
+                    if ($dados) {
+                        $pdo->prepare("UPDATE contas SET nome = ?, sobrenome = ?, username = ? WHERE id = ?")
+                            ->execute([$dados['nome'], $dados['sobrenome'], $dados['username'], $rid]);
+                    }
+                }
+                usleep(150000); // 150ms entre requests para não sobrecarregar a API
+            }
+        }
+        break;
+
     case 'mudar_status_direto':
         $id = filter_input(INPUT_POST, 'conta_id', FILTER_VALIDATE_INT);
         $novo_status = filter_input(INPUT_POST, 'novo_status', FILTER_SANITIZE_SPECIAL_CHARS);
