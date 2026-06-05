@@ -125,14 +125,21 @@ if (!function_exists('buildRichText')) {
 if (!function_exists('sincronizarSlackTracker')) {
     function sincronizarSlackTracker($pdo) {
         try {
-            // 1. Obter configurações do Slack
-            $stmtConf = $pdo->query("SELECT slack_token, slack_canal_notificacao FROM configuracoes LIMIT 1");
+            // 1. Obter configurações do Slack e domínio
+            $stmtConf = $pdo->query("SELECT slack_token, slack_canal_notificacao, email_dominio FROM configuracoes LIMIT 1");
             $config = $stmtConf->fetch();
             if (!$config) return;
 
             $token = $config['slack_token'] ?? '';
             $canal = $config['slack_canal_notificacao'] ?? '';
             if (empty($token)) return;
+
+            $dominioEmail = $config['email_dominio'] ?? '';
+            $dominioLimpo = ltrim($dominioEmail, '@');
+            $nomeDominio = strtolower(explode('.', $dominioLimpo)[0]);
+            if (empty($nomeDominio)) {
+                $nomeDominio = "dollfinn";
+            }
 
             // 2. Determinar o mês atual (YYYY-MM)
             $mesAtual = date('Y-m');
@@ -323,14 +330,15 @@ if (!function_exists('sincronizarSlackTracker')) {
                                 break;
                             }
                         }
-                        if (strpos($subName, "50 Perfis Criados") !== false) {
+                        if (strpos($subName, "perfis") !== false) {
                             $loteCount++;
                         }
                     }
                 }
 
-                $proximoLote = $loteCount + 1;
-                $loteText = "50 Perfis Criados - Lote " . $proximoLote;
+                $startRange = $loteCount * 50;
+                $endRange = ($loteCount + 1) * 50;
+                $loteText = "{$startRange} - {$endRange} perfis {$nomeDominio}";
                 $hoje = date('Y-m-d');
 
                 $chSub = curl_init("https://slack.com/api/slackLists.items.create");
@@ -383,14 +391,15 @@ if (!function_exists('sincronizarSlackTracker')) {
                                 break;
                             }
                         }
-                        if (strpos($subName, "50 BMs Criadas") !== false) {
+                        if (strpos($subName, "BMs") !== false) {
                             $loteCountBm++;
                         }
                     }
                 }
 
-                $proximoLoteBm = $loteCountBm + 1;
-                $loteTextBm = "50 BMs Criadas - Lote " . $proximoLoteBm;
+                $startRangeBm = $loteCountBm * 50;
+                $endRangeBm = ($loteCountBm + 1) * 50;
+                $loteTextBm = "{$startRangeBm} - {$endRangeBm} BMs {$nomeDominio}";
                 $hoje = date('Y-m-d');
 
                 $chSub = curl_init("https://slack.com/api/slackLists.items.create");
