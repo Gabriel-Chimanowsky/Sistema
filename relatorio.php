@@ -34,8 +34,15 @@ try {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 }
 
-// 1. Clientes COM movimentação no mês
-$sql_ativos = "SELECT p.id, p.nome, COUNT(c.id) as total 
+// Criar coluna excluir_nota se não existir
+try {
+    $pdo->query("SELECT excluir_nota FROM contas LIMIT 1");
+} catch (Exception $e) {
+    $pdo->query("ALTER TABLE contas ADD COLUMN excluir_nota TINYINT(1) NOT NULL DEFAULT 0");
+}
+
+// 1. Clientes COM movimentação no mês (faturamento considera apenas contas válidas/ativas)
+$sql_ativos = "SELECT p.id, p.nome, COALESCE(SUM(CASE WHEN c.excluir_nota = 0 THEN 1 ELSE 0 END), 0) as total 
                 FROM pessoas p 
                 INNER JOIN contas c ON p.id = c.destinada_a 
                 WHERE DATE_FORMAT(c.data_vinculo, '%Y-%m') = ?
@@ -172,7 +179,7 @@ $valor_total_mes = max(0, ($total_geral_mes * $preco_unidade) - $total_descontos
 
         <!-- LOOP DE IMPRESSÃO - UMA FOLHA POR PESSOA ATIVA -->
         <?php foreach ($ativos as $d): 
-            $stmtContas = $pdo->prepare("SELECT nome, sobrenome, email, data_vinculo FROM contas WHERE destinada_a = ? AND DATE_FORMAT(data_vinculo, '%Y-%m') = ? ORDER BY data_vinculo ASC");
+            $stmtContas = $pdo->prepare("SELECT id, nome, sobrenome, email, data_vinculo, excluir_nota FROM contas WHERE destinada_a = ? AND DATE_FORMAT(data_vinculo, '%Y-%m') = ? ORDER BY data_vinculo ASC");
             $stmtContas->execute([$d['id'], $mes_filtro]);
             $contas_pessoa = $stmtContas->fetchAll();
 
@@ -224,12 +231,29 @@ $valor_total_mes = max(0, ($total_geral_mes * $preco_unidade) - $total_descontos
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-                            <?php foreach ($contas_pessoa as $c): ?>
-                                <tr>
+                            <?php foreach ($contas_pessoa as $c): 
+                                $deu_ruim = (int)$c['excluir_nota'] === 1;
+                            ?>
+                                <tr class="<?= $deu_ruim ? 'opacity-40 line-through text-slate-450 dark:text-slate-500 bg-slate-50/30 dark:bg-slate-950/20' : '' ?>">
                                     <td class="p-4 font-mono text-slate-400"><?= date('d/m/Y H:i', strtotime($c['data_vinculo'])) ?></td>
                                     <td class="p-4 font-bold"><?= htmlspecialchars($c['nome'] . ' ' . $c['sobrenome']) ?></td>
-                                    <td class="p-4 font-bold text-blue-500"><?= htmlspecialchars($c['email']) ?></td>
-                                    <td class="p-4 text-right font-black">R$ 20,00</td>
+                                    <td class="p-4 font-bold text-blue-500 <?= $deu_ruim ? 'text-slate-450 dark:text-slate-500' : '' ?>"><?= htmlspecialchars($c['email']) ?></td>
+                                    <td class="p-4 text-right font-black">
+                                        <div class="flex items-center justify-end gap-2">
+                                            <span>R$ <?= $deu_ruim ? '0,00' : '20,00' ?></span>
+                                            <!-- Botão de Dar Baixa / Tirar da Nota (oculto no print) -->
+                                            <form action="processa.php?acao=toggle_nota" method="POST" class="inline no-print ml-2">
+                                                <input type="hidden" name="conta_id" value="<?= $c['id'] ?>">
+                                                <button type="submit" class="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" title="<?= $deu_ruim ? 'Reintroduzir na cobrança' : 'Dar Baixa (Tirar da cobrança)' ?>">
+                                                    <?php if ($deu_ruim): ?>
+                                                        <i data-lucide="rotate-ccw" class="w-3.5 h-3.5 text-blue-500 hover:scale-110 transition-transform"></i>
+                                                    <?php else: ?>
+                                                        <i data-lucide="ban" class="w-3.5 h-3.5 text-red-500 hover:scale-110 transition-transform"></i>
+                                                    <?php endif; ?>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
                                 </tr>
                             <?php endforeach; ?>
                             

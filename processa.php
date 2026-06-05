@@ -357,6 +357,16 @@ switch ($acao) {
         if ($id) $pdo->prepare("DELETE FROM descontos WHERE id = ?")->execute([$id]);
         break;
 
+    case 'toggle_nota':
+        try { $pdo->query("SELECT excluir_nota FROM contas LIMIT 1"); } catch (Exception $e) {
+            $pdo->query("ALTER TABLE contas ADD COLUMN excluir_nota TINYINT(1) NOT NULL DEFAULT 0");
+        }
+        $id = filter_input(INPUT_POST, 'conta_id', FILTER_VALIDATE_INT);
+        if ($id) {
+            $pdo->prepare("UPDATE contas SET excluir_nota = 1 - excluir_nota WHERE id = ?")->execute([$id]);
+        }
+        break;
+
 
 header("Location: " . $voltar_para . (strpos($voltar_para, '?') !== false ? '&' : '?') . "msg=ok");
 exit;
