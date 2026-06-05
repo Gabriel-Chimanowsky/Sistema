@@ -103,6 +103,40 @@ $config = $stmt->fetch();
                     </div>
                 </div>
             </div>
+
+            <!-- Nova Seção: Integração Slack -->
+            <div class="border-t pt-10 dark:border-slate-800 grid grid-cols-1 md:grid-cols-2 gap-10">
+                <div class="space-y-6">
+                    <h3 class="text-xs font-black uppercase tracking-[0.2em] text-slate-400 border-b pb-2 dark:border-slate-800">Integração Slack Lists</h3>
+                    
+                    <div class="space-y-2">
+                        <label class="block text-sm font-bold text-slate-500 uppercase tracking-wider ml-1">Token do Slack (Bot OAuth Token)</label>
+                        <input type="text" name="slack_token" value="<?= htmlspecialchars($config['slack_token'] ?? '') ?>" 
+                            class="w-full bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-blue-500 p-4 rounded-2xl outline-none transition-all font-bold font-mono" placeholder="xoxb-...">
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="block text-sm font-bold text-slate-500 uppercase tracking-wider ml-1">Canal / ID de Conversa para Notificações</label>
+                        <input type="text" name="slack_canal_notificacao" value="<?= htmlspecialchars($config['slack_canal_notificacao'] ?? '') ?>" 
+                            class="w-full bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-blue-500 p-4 rounded-2xl outline-none transition-all font-bold" placeholder="Ex: C0123456789 ou #geral">
+                    </div>
+                </div>
+
+                <div class="space-y-6 flex flex-col justify-end">
+                    <div class="bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/50 p-6 rounded-3xl text-xs space-y-3">
+                        <div class="font-bold text-blue-800 dark:text-blue-400 flex items-center gap-2">
+                            <i data-lucide="info" class="w-4 h-4"></i>
+                            Sobre a Automação do Slack
+                        </div>
+                        <p class="text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
+                            O bot criará automaticamente uma lista de tarefas no Slack a cada mês. O link para a nova lista do mês será enviado no canal especificado acima.
+                        </p>
+                        <p class="text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
+                            Certifique-se de que o Bot foi adicionado ao canal desejado no Slack digitando <code class="bg-blue-100/60 dark:bg-blue-900/40 px-1 py-0.5 rounded font-bold font-mono text-[11px]">/invite @Bot</code> no chat.
+                        </p>
+                    </div>
+                </div>
+            </div>
         </form>
     </div>
 

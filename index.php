@@ -3,6 +3,9 @@ require_once 'conexao.php';
 require_once 'auth.php';
 checkAuth();
 
+// Sincronização automática com Slack Lists
+sincronizarSlackTracker($pdo);
+
 if (isFinanceiro()) {
     header("Location: relatorio.php");
     exit;
@@ -93,8 +96,22 @@ if ($dir !== 'ASC' && $dir !== 'DESC') $dir = 'DESC';
 $stmtPessoas = $pdo->query("SELECT * FROM pessoas ORDER BY nome ASC");
 $pessoas = $stmtPessoas->fetchAll();
 
+// Paginação
+$limit = 50;
+$page = filter_input(INPUT_GET, 'page', FILTER_VALIDATE_INT) ?: 1;
+if ($page < 1) $page = 1;
+
+$totalContasQuery = $pdo->query("SELECT COUNT(*) FROM contas")->fetchColumn();
+$totalPages = max(1, ceil($totalContasQuery / $limit));
+if ($page > $totalPages) $page = $totalPages;
+
+$offset = ($page - 1) * $limit;
+
 $ordemSQL = "{$sort} {$dir}";
-$stmtContas = $pdo->query("SELECT *, UNIX_TIMESTAMP(data_criacao) as criacao_unix, UNIX_TIMESTAMP(data_autenticacao) as auth_unix FROM contas ORDER BY {$ordemSQL}");
+$stmtContas = $pdo->prepare("SELECT *, UNIX_TIMESTAMP(data_criacao) as criacao_unix, UNIX_TIMESTAMP(data_autenticacao) as auth_unix, UNIX_TIMESTAMP(data_exportado) as export_unix FROM contas ORDER BY {$ordemSQL} LIMIT ? OFFSET ?");
+$stmtContas->bindValue(1, $limit, PDO::PARAM_INT);
+$stmtContas->bindValue(2, $offset, PDO::PARAM_INT);
+$stmtContas->execute();
 $contas = $stmtContas->fetchAll();
 $tempoDb = time();
 
@@ -242,7 +259,10 @@ function linkSort($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
                             $restante = 0;
                             if (!empty($conta['criacao_unix'])) $restante = 3600 - ($tempoDb - $conta['criacao_unix']);
                             $dias_vida = 0;
-                            if (in_array($conta['status'], ['autenticada', 'exportado']) && !empty($conta['auth_unix'])) $dias_vida = floor(($tempoDb - $conta['auth_unix']) / 86400);
+                            $tempo_referencia = !empty($conta['export_unix']) ? $conta['export_unix'] : (!empty($conta['auth_unix']) ? $conta['auth_unix'] : $conta['criacao_unix']);
+                            if (in_array($conta['status'], ['autenticada', 'exportado']) && !empty($tempo_referencia)) {
+                                $dias_vida = floor(($tempoDb - $tempo_referencia) / 86400);
+                            }
                         ?>
                         <tr class="tr-hover group transition-colors <?= $conta['status'] === 'exportado' ? 'opacity-80 grayscale-[0.2]' : '' ?>" data-id="<?= $conta['id'] ?>" data-json='<?= json_encode($conta) ?>'>
                             <td class="p-4 text-center"><input type="checkbox" class="check-conta w-4 h-4 rounded-md border-slate-300 dark:border-slate-600"></td>
@@ -327,7 +347,37 @@ function linkSort($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
                                 <?php if ($conta['status'] === 'criada'): ?>
                                     <div class="countdown-timer text-[10px] mt-2 font-black text-amber-600 animate-pulse" data-restante="<?= $restante ?>"></div>
                                 <?php elseif (in_array($conta['status'], ['autenticada', 'exportado'])): ?>
-                                    <div class="text-[10px] mt-2 font-bold text-emerald-600">Vida: <?= $dias_vida ?> dias</div>
+                                    <div class="text-[10px] mt-1 font-bold text-emerald-600">Vida: <?= $dias_vida ?> <?= $dias_vida == 1 ? 'dia' : 'dias' ?></div>
+                                    
+                                    <!-- Bloco de BM -->
+                                    <div class="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                                        <?php if ($conta['bm_criada'] == 1): 
+                                            $dias_bm = 0;
+                                            if (!empty($conta['data_bm_criada'])) {
+                                                $dias_bm = floor((time() - strtotime($conta['data_bm_criada'])) / 86400);
+                                            }
+                                        ?>
+                                            <span class="inline-flex items-center gap-1 text-[9px] font-black uppercase text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 rounded-lg">
+                                                <i data-lucide="check-square" class="w-3 h-3"></i>
+                                                BM Criada (<?= $dias_bm ?>d)
+                                            </span>
+                                        <?php else: ?>
+                                            <?php if ($dias_vida >= 7): ?>
+                                                <form method="POST" action="processa.php" class="inline-block">
+                                                    <input type="hidden" name="acao" value="criar_bm">
+                                                    <input type="hidden" name="conta_id" value="<?= $conta['id'] ?>">
+                                                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[9px] uppercase px-2 py-1 rounded-lg shadow-sm transition active:scale-95 flex items-center gap-1">
+                                                        <i data-lucide="plus-circle" class="w-2.5 h-2.5"></i>
+                                                        Criar BM
+                                                    </button>
+                                                </form>
+                                            <?php else: ?>
+                                                <span class="inline-block text-[9px] font-bold text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800/40 px-1.5 py-0.5 rounded-lg" title="Aguardando maturação de 7 dias">
+                                                    Maturando (falta <?= 7 - $dias_vida ?>d)
+                                                </span>
+                                            <?php endif; ?>
+                                        <?php endif; ?>
+                                    </div>
                                 <?php endif; ?>
                             </td>
                             <td class="p-4">
@@ -387,6 +437,49 @@ function linkSort($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
                     </tbody>
                 </table>
             </div>
+            
+            <!-- Barra de Paginação -->
+            <?php if ($totalPages > 1): ?>
+                <div class="bg-slate-50 dark:bg-slate-800/20 px-6 py-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                    <div class="text-xs text-slate-500 font-semibold">
+                        Mostrando página <span class="text-slate-800 dark:text-slate-200 font-extrabold"><?= $page ?></span> de <span class="text-slate-800 dark:text-slate-200 font-extrabold"><?= $totalPages ?></span> (Total: <?= $totalContasQuery ?> contas)
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <!-- Botão Anterior -->
+                        <?php if ($page > 1): ?>
+                            <a href="?page=<?= $page - 1 ?>&sort=<?= $sort ?>&dir=<?= $dir ?>" class="p-2 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-xl transition-all shadow-sm flex items-center justify-center text-slate-600 dark:text-slate-300">
+                                <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                            </a>
+                        <?php else: ?>
+                            <div class="p-2 bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-300 dark:text-slate-600 cursor-not-allowed">
+                                <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                            </div>
+                        <?php endif; ?>
+
+                        <!-- Números de Página -->
+                        <?php
+                        $startPage = max(1, $page - 2);
+                        $endPage = min($totalPages, $page + 2);
+                        for ($p = $startPage; $p <= $endPage; $p++):
+                        ?>
+                            <a href="?page=<?= $p ?>&sort=<?= $sort ?>&dir=<?= $dir ?>" class="px-3.5 py-1.5 text-xs font-black rounded-xl border transition-all shadow-sm <?= $p === $page ? 'bg-blue-600 border-blue-600 text-white shadow-blue-600/10' : 'bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300' ?>">
+                                <?= $p ?>
+                            </a>
+                        <?php endfor; ?>
+
+                        <!-- Botão Próximo -->
+                        <?php if ($page < $totalPages): ?>
+                            <a href="?page=<?= $page + 1 ?>&sort=<?= $sort ?>&dir=<?= $dir ?>" class="p-2 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-xl transition-all shadow-sm flex items-center justify-center text-slate-600 dark:text-slate-300">
+                                <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                            </a>
+                        <?php else: ?>
+                            <div class="p-2 bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-300 dark:text-slate-600 cursor-not-allowed">
+                                <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            <?php endif; ?>
         </div>
     </main>
 

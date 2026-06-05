@@ -73,7 +73,7 @@ switch ($acao) {
             ];
             
             // Marcar como exportado
-            $pdo->prepare("UPDATE contas SET status = 'exportado' WHERE id = ?")->execute([$c['id']]);
+            $pdo->prepare("UPDATE contas SET status = 'exportado', data_exportado = NOW() WHERE id = ?")->execute([$c['id']]);
         }
 
         $xlsx = \Shuchkin\SimpleXLSXGen::fromArray($planilha);
@@ -91,6 +91,7 @@ switch ($acao) {
                 $sql = "UPDATE contas SET status = ?";
                 if ($novo_status === 'criada') $sql .= ", data_criacao = NOW()";
                 elseif ($novo_status === 'autenticada') $sql .= ", data_autenticacao = NOW()";
+                elseif ($novo_status === 'exportado') $sql .= ", data_exportado = NOW()";
                 $sql .= " WHERE id IN ($in)";
                 
                 $stmt = $pdo->prepare($sql);
@@ -155,6 +156,7 @@ switch ($acao) {
             $sql = "UPDATE contas SET status = ?";
             if ($novo_status === 'criada') $sql .= ", data_criacao = NOW()";
             elseif ($novo_status === 'autenticada') $sql .= ", data_autenticacao = NOW()";
+            elseif ($novo_status === 'exportado') $sql .= ", data_exportado = NOW()";
             $sql .= " WHERE id = ?";
             $pdo->prepare($sql)->execute([$novo_status, $id]);
         }
@@ -262,6 +264,7 @@ switch ($acao) {
             // Pequeno delay para não sobrecarregar se for muitos
             if ($qtd > 5) usleep(100000); 
         }
+        sincronizarSlackTracker($pdo);
         break;
 
     case 'regerar_conta':
@@ -320,10 +323,11 @@ switch ($acao) {
         break;
 
     case 'atualizar_config':
-        $sql = "UPDATE configuracoes SET senha_padrao = ?, email_contador = ?, genero_padrao = ?, pais_padrao = ?, email_prefixo = ?, email_dominio = ?";
+        $sql = "UPDATE configuracoes SET senha_padrao = ?, email_contador = ?, genero_padrao = ?, pais_padrao = ?, email_prefixo = ?, email_dominio = ?, slack_token = ?, slack_canal_notificacao = ?";
         $pdo->prepare($sql)->execute([
             $_POST['senha_padrao'], $_POST['email_contador'], $_POST['genero_padrao'], 
-            $_POST['pais_padrao'], $_POST['email_prefixo'], $_POST['email_dominio']
+            $_POST['pais_padrao'], $_POST['email_prefixo'], $_POST['email_dominio'],
+            $_POST['slack_token'], $_POST['slack_canal_notificacao']
         ]);
         break;
 
@@ -363,7 +367,15 @@ switch ($acao) {
         }
         $id = filter_input(INPUT_POST, 'conta_id', FILTER_VALIDATE_INT);
         if ($id) {
-            $pdo->prepare("UPDATE contas SET excluir_nota = 1 - excluir_nota WHERE id = ?")->execute([$id]);
+            $pdo->prepare("UPDATE contas SET excluir_nota = 1 - COALESCE(excluir_nota, 0) WHERE id = ?")->execute([$id]);
+        }
+        break;
+
+    case 'criar_bm':
+        $id = filter_input(INPUT_POST, 'conta_id', FILTER_VALIDATE_INT);
+        if ($id) {
+            $pdo->prepare("UPDATE contas SET bm_criada = 1, data_bm_criada = NOW() WHERE id = ?")->execute([$id]);
+            sincronizarSlackTracker($pdo);
         }
         break;
 }
