@@ -48,22 +48,74 @@ function copiarFallback(txt, msg) {
 }
 
 
-function mudarStatusMassa() {
-    const checks = document.querySelectorAll('.check-conta:checked');
-    const status = document.getElementById('status_massa').value;
-    if (!status || checks.length === 0) {
-        if (window.location.pathname.includes('index.php')) {
-            return mostrarToast('Selecione contas e status');
-        } else {
-            window.location.href = 'index.php';
-            return;
-        }
-    }
-    const ids = Array.from(checks).map(c => c.closest('tr').dataset.id);
-    const f = document.createElement('form'); f.method = 'POST'; f.action = 'processa.php';
-    f.innerHTML = `<input name="acao" value="mudar_status_massa"><input name="ids" value="${ids.join(',')}"><input name="novo_status" value="${status}">`;
-    document.body.appendChild(f); f.submit();
+function toggleSelectPessoa(val) {
+    const sp = document.getElementById('select_pessoa_massa');
+    if (!sp) return;
+    sp.classList.toggle('hidden', val !== 'dono');
 }
+
+function executarAcaoLoteNavbar() {
+    const sel = document.getElementById('status_massa');
+    const acao = sel ? sel.value : '';
+    const checks = document.querySelectorAll('.check-conta:checked');
+
+    if (!acao) return mostrarToast('Selecione uma ação em lote');
+
+    if (!window.location.pathname.includes('index.php')) {
+        window.location.href = 'index.php';
+        return;
+    }
+
+    if (checks.length === 0) return mostrarToast('Selecione ao menos uma conta');
+
+    const ids = Array.from(checks).map(c => c.closest('tr[data-id]').dataset.id).join(',');
+
+    // Status
+    if (acao.startsWith('status:')) {
+        const novo_status = acao.split(':')[1];
+        submitLote('mudar_status_massa', { ids, novo_status });
+        return;
+    }
+
+    // Mudar Dono
+    if (acao === 'dono') {
+        const sp = document.getElementById('select_pessoa_massa');
+        const pessoa_id = sp ? sp.value : '';
+        submitLote('vincular_pessoa_massa', { ids, pessoa_id });
+        return;
+    }
+
+    // Regerar
+    if (acao === 'regerar') {
+        if (!confirm(`Regerar dados de ${checks.length} conta(s)?`)) return;
+        submitLote('regerar_massa', { ids });
+        return;
+    }
+
+    // Deletar
+    if (acao === 'deletar') {
+        if (!confirm(`Excluir permanentemente ${checks.length} conta(s)?`)) return;
+        submitLote('del_massa', { ids });
+        return;
+    }
+}
+
+function submitLote(acao, campos) {
+    const f = document.createElement('form');
+    f.method = 'POST';
+    f.action = 'processa.php';
+    let html = `<input name="acao" value="${acao}">`;
+    for (const [k, v] of Object.entries(campos)) {
+        html += `<input name="${k}" value="${v}">`;
+    }
+    f.innerHTML = html;
+    document.body.appendChild(f);
+    f.submit();
+}
+
+// Mantida por compatibilidade (navbar antigo)
+function mudarStatusMassa() { executarAcaoLoteNavbar(); }
+
 
 function exportarContas() {
     const checks = document.querySelectorAll('.check-conta:checked');

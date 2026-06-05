@@ -25,14 +25,33 @@ $current_page = basename($_SERVER['PHP_SELF']);
         <div class="flex items-center justify-end gap-4">
             <?php if (!isFinanceiro()): ?>
                 <div class="hidden lg:flex items-center gap-2 border-r border-slate-200 dark:border-slate-800 pr-4 mr-2">
-                    <select id="status_massa" class="bg-white dark:bg-slate-900 border dark:border-slate-800 text-sm font-bold outline-none cursor-pointer p-1 rounded-lg">
+                    <select id="status_massa" onchange="toggleSelectPessoa(this.value)" class="bg-white dark:bg-slate-900 border dark:border-slate-800 text-sm font-bold outline-none cursor-pointer p-1 rounded-lg">
                         <option value="">Ação em Lote</option>
-                        <option value="pendente">Status: Pendente</option>
-                        <option value="criada">Status: Criada</option>
-                        <option value="autenticada">Status: Autenticada</option>
-                        <option value="exportado">Status: Exportado</option>
+                        <optgroup label="── Status ──">
+                            <option value="status:pendente">Status: Pendente</option>
+                            <option value="status:criada">Status: Criada</option>
+                            <option value="status:autenticada">Status: Autenticada</option>
+                            <option value="status:exportado">Status: Exportado</option>
+                        </optgroup>
+                        <optgroup label="── Outras ──">
+                            <option value="dono">Mudar Dono</option>
+                            <option value="regerar">Regerar Dados</option>
+                            <option value="deletar">Deletar</option>
+                        </optgroup>
                     </select>
-                    <button onclick="mudarStatusMassa()" class="p-1.5 bg-slate-900 text-white dark:bg-white dark:text-slate-900 rounded-lg hover:scale-105 transition active:scale-95 shadow-sm">
+                    <!-- Select de pessoas (só aparece ao escolher "Mudar Dono") -->
+                    <select id="select_pessoa_massa" class="hidden bg-white dark:bg-slate-900 border dark:border-slate-800 text-sm font-bold outline-none cursor-pointer p-1 rounded-lg">
+                        <option value="">-- Livre --</option>
+                        <?php
+                        if (!isFinanceiro()) {
+                            $stmtP = $pdo->query("SELECT * FROM pessoas ORDER BY nome ASC");
+                            foreach ($stmtP->fetchAll() as $p) {
+                                echo "<option value=\"{$p['id']}\">" . htmlspecialchars($p['nome']) . "</option>";
+                            }
+                        }
+                        ?>
+                    </select>
+                    <button onclick="executarAcaoLoteNavbar()" class="p-1.5 bg-slate-900 text-white dark:bg-white dark:text-slate-900 rounded-lg hover:scale-105 transition active:scale-95 shadow-sm">
                         <i data-lucide="play" class="w-4 h-4 fill-current"></i>
                     </button>
                 </div>
