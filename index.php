@@ -394,7 +394,6 @@ function linkSort($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
     <div class="fixed bottom-0 left-0 w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 shadow-2xl z-40">
         <div class="max-w-[1600px] mx-auto px-4">
 
-            <!-- Barra de seleção em lote (visível quando há checkboxes marcados) -->
             <div id="barraLote" class="hidden py-3 border-b border-slate-200 dark:border-slate-800">
                 <div class="flex flex-wrap items-center gap-2">
                     <span id="loteContador" class="text-xs font-black text-blue-600 bg-blue-50 dark:bg-blue-900/30 px-3 py-1.5 rounded-full">0 selecionadas</span>
@@ -402,14 +401,14 @@ function linkSort($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
                     <!-- Mudar Status em Lote -->
                     <form id="formStatusMassa" method="POST" action="processa.php" class="flex items-center gap-1">
                         <input type="hidden" name="acao" value="mudar_status_massa">
-                        <input type="hidden" name="ids" class="ids-input">
-                        <select name="novo_status" class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold rounded-lg px-2 py-1.5 outline-none cursor-pointer">
+                        <input type="hidden" name="ids" id="idsStatusMassa">
+                        <select name="novo_status" id="selectStatusMassa" class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold rounded-lg px-2 py-1.5 outline-none cursor-pointer">
                             <option value="pendente">Pendente</option>
                             <option value="criada">Criada</option>
                             <option value="autenticada">Autenticada</option>
                             <option value="exportado">Exportado</option>
                         </select>
-                        <button type="submit" onclick="preencherIdsLote(this.closest('form'))" class="bg-slate-700 dark:bg-slate-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:scale-105 transition">
+                        <button type="button" onclick="submitLoteComIds('formStatusMassa','idsStatusMassa')" class="bg-slate-700 dark:bg-slate-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:scale-105 transition">
                             <i data-lucide="check-circle" class="w-3 h-3 inline mr-1"></i>Status
                         </button>
                     </form>
@@ -417,16 +416,16 @@ function linkSort($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
                     <div class="w-px h-6 bg-slate-200 dark:bg-slate-700"></div>
 
                     <!-- Mudar Dono em Lote -->
-                    <form id="formDonaMassa" method="POST" action="processa.php" class="flex items-center gap-1">
+                    <form id="formDonoMassa" method="POST" action="processa.php" class="flex items-center gap-1">
                         <input type="hidden" name="acao" value="vincular_pessoa_massa">
-                        <input type="hidden" name="ids" class="ids-input">
+                        <input type="hidden" name="ids" id="idsDonoMassa">
                         <select name="pessoa_id" class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold rounded-lg px-2 py-1.5 outline-none cursor-pointer">
                             <option value="">-- Livre --</option>
                             <?php foreach ($pessoas as $p): ?>
                                 <option value="<?= $p['id'] ?>"><?= htmlspecialchars($p['nome']) ?></option>
                             <?php endforeach; ?>
                         </select>
-                        <button type="submit" onclick="preencherIdsLote(this.closest('form'))" class="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:scale-105 transition">
+                        <button type="button" onclick="submitLoteComIds('formDonoMassa','idsDonoMassa')" class="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:scale-105 transition">
                             <i data-lucide="user-check" class="w-3 h-3 inline mr-1"></i>Dono
                         </button>
                     </form>
@@ -436,8 +435,8 @@ function linkSort($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
                     <!-- Regerar em Lote -->
                     <form id="formRegerarMassa" method="POST" action="processa.php" class="flex items-center">
                         <input type="hidden" name="acao" value="regerar_massa">
-                        <input type="hidden" name="ids" class="ids-input">
-                        <button type="button" onclick="confirmarAcaoLote('Regerar dados das contas selecionadas?', document.getElementById(\'formRegerarMassa\'))" class="bg-purple-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:scale-105 transition flex items-center gap-1">
+                        <input type="hidden" name="ids" id="idsRegerarMassa">
+                        <button type="button" onclick="confirmarLote('Regerar dados das contas selecionadas?','formRegerarMassa','idsRegerarMassa')" class="bg-purple-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:scale-105 transition flex items-center gap-1">
                             <i data-lucide="refresh-cw" class="w-3 h-3"></i>Regerar
                         </button>
                     </form>
@@ -447,8 +446,8 @@ function linkSort($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
                     <!-- Deletar em Lote -->
                     <form id="formDelMassa" method="POST" action="processa.php" class="flex items-center">
                         <input type="hidden" name="acao" value="del_massa">
-                        <input type="hidden" name="ids" class="ids-input">
-                        <button type="button" onclick="confirmarAcaoLote('Excluir permanentemente as contas selecionadas?', document.getElementById(\'formDelMassa\'))" class="bg-red-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:scale-105 transition flex items-center gap-1">
+                        <input type="hidden" name="ids" id="idsDelMassa">
+                        <button type="button" onclick="confirmarLote('Excluir permanentemente as contas selecionadas?','formDelMassa','idsDelMassa')" class="bg-red-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:scale-105 transition flex items-center gap-1">
                             <i data-lucide="trash-2" class="w-3 h-3"></i>Excluir
                         </button>
                     </form>
@@ -458,8 +457,8 @@ function linkSort($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
                     <!-- Exportar em Lote -->
                     <form id="formExportMassa" method="POST" action="processa.php" class="flex items-center">
                         <input type="hidden" name="acao" value="exportar_csv">
-                        <input type="hidden" name="ids" class="ids-input">
-                        <button type="submit" onclick="preencherIdsLote(this.closest('form'))" class="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:scale-105 transition flex items-center gap-1">
+                        <input type="hidden" name="ids" id="idsExportMassa">
+                        <button type="button" onclick="submitLoteComIds('formExportMassa','idsExportMassa')" class="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:scale-105 transition flex items-center gap-1">
                             <i data-lucide="download" class="w-3 h-3"></i>Exportar
                         </button>
                     </form>
@@ -581,14 +580,20 @@ function linkSort($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
             }
         }
 
-        function preencherIdsLote(form) {
+        // Preenche o campo de ids e submete o form (para ações sem confirmação)
+        function submitLoteComIds(formId, idsFieldId) {
             const ids = getSelecionados();
-            form.querySelector('.ids-input').value = ids.join(',');
+            if (ids.length === 0) return mostrarToast('Selecione ao menos uma conta');
+            document.getElementById(idsFieldId).value = ids.join(',');
+            document.getElementById(formId).submit();
         }
 
-        function confirmarAcaoLote(txt, form) {
-            preencherIdsLote(form);
-            abrirModal(txt, form);
+        // Preenche ids e abre modal de confirmação antes de submeter
+        function confirmarLote(txt, formId, idsFieldId) {
+            const ids = getSelecionados();
+            if (ids.length === 0) return mostrarToast('Selecione ao menos uma conta');
+            document.getElementById(idsFieldId).value = ids.join(',');
+            abrirModal(txt, document.getElementById(formId));
         }
 
         // Observar mudanças nos checkboxes
