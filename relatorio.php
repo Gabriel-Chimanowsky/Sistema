@@ -17,6 +17,23 @@ $ano = substr($mes_filtro, 0, 4);
 $mes_num = substr($mes_filtro, 5, 2);
 $mes_por_extenso = $meses_nomes[$mes_num] . " " . $ano;
 
+// Criar tabela de descontos se não existir
+try {
+    $pdo->query("SELECT id FROM descontos LIMIT 1");
+} catch (Exception $e) {
+    $pdo->query("CREATE TABLE IF NOT EXISTS `descontos` (
+        `id` int(11) NOT NULL AUTO_INCREMENT,
+        `pessoa_id` int(11) NOT NULL,
+        `mes` varchar(7) NOT NULL COMMENT 'Formato YYYY-MM',
+        `motivo` varchar(255) NOT NULL,
+        `valor` decimal(10,2) NOT NULL,
+        `criado_em` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (`id`),
+        KEY `pessoa_id` (`pessoa_id`),
+        CONSTRAINT `descontos_ibfk_1` FOREIGN KEY (`pessoa_id`) REFERENCES `pessoas` (`id`) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+}
+
 // 1. Clientes COM movimentação no mês
 $sql_ativos = "SELECT p.id, p.nome, COUNT(c.id) as total 
                 FROM pessoas p 
@@ -42,9 +59,24 @@ $sql_outros = "SELECT nome FROM pessoas
 $outros = $pdo->query($sql_outros)->fetchAll();
 
 // Estatísticas Gerais do Período
-$stmtTotalGeral = $pdo->prepare("SELECT COUNT(*) FROM contas WHERE DATE_FORMAT(data_vinculo, '%Y-%m') = ?");
-$stmtTotalGeral->execute([$mes_filtro]);
-$total_geral_mes = $stmtTotalGeral->fetchColumn();
+$total_geral_mes = 0;
+foreach ($ativos as $at) {
+    $total_geral_mes += $at['total'];
+}
+
+// 2. Descontos do período
+$stmtTotalDescontos = $pdo->prepare("
+    SELECT SUM(d.valor) 
+    FROM descontos d
+    INNER JOIN pessoas p ON d.pessoa_id = p.id
+    WHERE d.mes = ?
+    AND LOWER(p.nome) != 'administrador'
+");
+$stmtTotalDescontos->execute([$mes_filtro]);
+$total_descontos_mes = (float)$stmtTotalDescontos->fetchColumn();
+
+// 3. Valor Total Líquido
+$valor_total_mes = max(0, ($total_geral_mes * $preco_unidade) - $total_descontos_mes);
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -124,9 +156,16 @@ $total_geral_mes = $stmtTotalGeral->fetchColumn();
                     <div class="text-xs font-black uppercase text-slate-400 mb-2 tracking-widest">Total de Contas Pegas</div>
                     <div class="text-5xl font-black text-slate-900 dark:text-white"><?= $total_geral_mes ?></div>
                 </div>
-                <div class="bg-slate-50 dark:bg-slate-800/50 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800">
-                    <div class="text-xs font-black uppercase text-slate-400 mb-2 tracking-widest">Valor Total do Mês</div>
-                    <div class="text-5xl font-black text-emerald-600">R$ <?= number_format($total_geral_mes * $preco_unidade, 2, ',', '.') ?></div>
+                <div class="bg-slate-50 dark:bg-slate-800/50 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800 flex flex-col justify-between">
+                    <div>
+                        <div class="text-xs font-black uppercase text-slate-400 mb-2 tracking-widest">Valor Total do Mês</div>
+                        <div class="text-5xl font-black text-emerald-600">R$ <?= number_format($valor_total_mes, 2, ',', '.') ?></div>
+                    </div>
+                    <?php if ($total_descontos_mes > 0): ?>
+                        <div class="text-[10px] font-bold text-red-500 uppercase tracking-wider mt-2">
+                            Total Descontado: R$ <?= number_format($total_descontos_mes, 2, ',', '.') ?>
+                        </div>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -136,6 +175,18 @@ $total_geral_mes = $stmtTotalGeral->fetchColumn();
             $stmtContas = $pdo->prepare("SELECT nome, sobrenome, email, data_vinculo FROM contas WHERE destinada_a = ? AND DATE_FORMAT(data_vinculo, '%Y-%m') = ? ORDER BY data_vinculo ASC");
             $stmtContas->execute([$d['id'], $mes_filtro]);
             $contas_pessoa = $stmtContas->fetchAll();
+
+            // Buscar descontos da pessoa
+            $stmtDescontos = $pdo->prepare("SELECT id, motivo, valor FROM descontos WHERE pessoa_id = ? AND mes = ? ORDER BY criado_em ASC");
+            $stmtDescontos->execute([$d['id'], $mes_filtro]);
+            $descontos_pessoa = $stmtDescontos->fetchAll();
+
+            $total_descontos = 0;
+            foreach ($descontos_pessoa as $desc) {
+                $total_descontos += $desc['valor'];
+            }
+            $valor_contas = $d['total'] * $preco_unidade;
+            $valor_final_pessoa = max(0, $valor_contas - $total_descontos);
         ?>
         <div class="bg-white dark:bg-slate-900 rounded-[2.5rem] p-10 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-10 print-break mb-10 client-card">
             <div class="flex justify-between items-start border-b pb-8 dark:border-slate-800">
@@ -150,8 +201,13 @@ $total_geral_mes = $stmtTotalGeral->fetchColumn();
                 </div>
                 <div class="text-right">
                     <div class="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] mb-1">Total a Pagar</div>
-                    <div class="text-3xl font-black text-blue-600">R$ <?= number_format($d['total'] * $preco_unidade, 2, ',', '.') ?></div>
-                    <div class="text-[10px] font-bold text-slate-400 italic"><?= $d['total'] ?> contas x R$ 20,00</div>
+                    <div class="text-3xl font-black text-blue-600">R$ <?= number_format($valor_final_pessoa, 2, ',', '.') ?></div>
+                    <div class="text-[10px] font-bold text-slate-400 italic">
+                        <?= $d['total'] ?> contas x R$ 20,00
+                        <?php if ($total_descontos > 0): ?>
+                            (- R$ <?= number_format($total_descontos, 2, ',', '.') ?> desc.)
+                        <?php endif; ?>
+                    </div>
                 </div>
             </div>
 
@@ -176,18 +232,69 @@ $total_geral_mes = $stmtTotalGeral->fetchColumn();
                                     <td class="p-4 text-right font-black">R$ 20,00</td>
                                 </tr>
                             <?php endforeach; ?>
+                            
+                            <!-- Descontos na Tabela -->
+                            <?php if (!empty($descontos_pessoa)): ?>
+                                <?php foreach ($descontos_pessoa as $desc): ?>
+                                    <tr class="bg-red-50/20 dark:bg-red-950/10 text-red-600 dark:text-red-400">
+                                        <td class="p-4 font-bold uppercase tracking-wider text-[10px]">Desconto</td>
+                                        <td class="p-4 font-bold" colspan="2">
+                                            <div class="flex items-center justify-between">
+                                                <span><?= htmlspecialchars($desc['motivo']) ?></span>
+                                                <!-- Botão de Excluir Desconto (oculto no print) -->
+                                                <form action="processa.php?acao=del_desconto" method="POST" class="inline no-print ml-2" onsubmit="return confirm('Tem certeza que deseja remover este desconto?')">
+                                                    <input type="hidden" name="desconto_id" value="<?= $desc['id'] ?>">
+                                                    <button type="submit" class="text-red-500 hover:text-red-700 p-1 rounded transition-colors" title="Remover Desconto">
+                                                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                        <td class="p-4 text-right font-black">- R$ <?= number_format($desc['valor'], 2, ',', '.') ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
                         </tbody>
                         <tfoot>
+                            <?php if ($total_descontos > 0): ?>
+                                <tr class="bg-slate-50/50 dark:bg-slate-800/30 text-slate-400 font-bold text-[11px]">
+                                    <td colspan="3" class="p-3 text-right uppercase tracking-widest">Subtotal Contas:</td>
+                                    <td class="p-3 text-right">R$ <?= number_format($valor_contas, 2, ',', '.') ?></td>
+                                </tr>
+                                <tr class="bg-slate-50/50 dark:bg-slate-800/30 text-red-500 font-bold text-[11px]">
+                                    <td colspan="3" class="p-3 text-right uppercase tracking-widest">Total Descontos:</td>
+                                    <td class="p-3 text-right">- R$ <?= number_format($total_descontos, 2, ',', '.') ?></td>
+                                </tr>
+                            <?php endif; ?>
                             <tr class="bg-slate-50 dark:bg-slate-800/50 font-black">
-                                <td colspan="3" class="p-4 text-right uppercase tracking-widest">Subtotal do Cliente:</td>
-                                <td class="p-4 text-right text-blue-600 text-lg">R$ <?= number_format($d['total'] * $preco_unidade, 2, ',', '.') ?></td>
+                                <td colspan="3" class="p-4 text-right uppercase tracking-widest">Total a Pagar:</td>
+                                <td class="p-4 text-right text-blue-600 text-lg">R$ <?= number_format($valor_final_pessoa, 2, ',', '.') ?></td>
                             </tr>
                         </tfoot>
                     </table>
                 </div>
             </div>
 
-            <div class="pt-8 flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-slate-400">
+            <!-- Formulário para Lançar Desconto (oculto no print) -->
+            <form action="processa.php?acao=add_desconto" method="POST" class="no-print mt-6 p-6 bg-slate-50 dark:bg-slate-800/30 rounded-3xl border border-slate-200 dark:border-slate-850/50 flex flex-wrap items-end gap-4">
+                <input type="hidden" name="pessoa_id" value="<?= $d['id'] ?>">
+                <input type="hidden" name="mes" value="<?= $mes_filtro ?>">
+                <div class="flex-1 min-w-[200px]">
+                    <label class="block text-[10px] font-black uppercase text-slate-400 mb-1.5 tracking-wider">Motivo do Desconto</label>
+                    <input type="text" name="motivo" required placeholder="Ex: Conta inativa, reposição de ID, etc." class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-semibold outline-none focus:border-blue-500 dark:focus:border-blue-500 transition-all">
+                </div>
+                <div class="w-32">
+                    <label class="block text-[10px] font-black uppercase text-slate-400 mb-1.5 tracking-wider">Valor (R$)</label>
+                    <input type="number" name="valor" step="0.01" min="0.01" required placeholder="0,00" class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-semibold outline-none focus:border-blue-500 dark:focus:border-blue-500 transition-all">
+                </div>
+                <div>
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-5 py-3 rounded-xl flex items-center gap-2 transition-all active:scale-95 shadow-md shadow-blue-600/10">
+                        <i data-lucide="plus" class="w-4 h-4"></i> Lançar Desconto
+                    </button>
+                </div>
+            </form>
+
+            <div class="pt-8 flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-slate-400 border-t border-slate-100 dark:border-slate-800">
                 <div>Facebook Account Manager v4.3</div>
                 <div>Data: <?= date('d/m/Y - H:i') ?></div>
             </div>

@@ -529,24 +529,7 @@ function linkSort($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
             setTimeout(() => mostrarToast('Ação realizada com sucesso!'), 300);
         }
 
-        // ── Scroll Restore ──────────────────────────────────────────
-        const SCROLL_KEY = 'index_scroll_y';
-        // Restaurar scroll assim que o DOM estiver pronto
-        const savedScroll = sessionStorage.getItem(SCROLL_KEY);
-        if (savedScroll) {
-            requestAnimationFrame(() => {
-                window.scrollTo({ top: parseInt(savedScroll), behavior: 'instant' });
-                sessionStorage.removeItem(SCROLL_KEY);
-            });
-        }
-        // Salvar scroll antes de qualquer submit de form
-        document.addEventListener('submit', () => {
-            sessionStorage.setItem(SCROLL_KEY, window.scrollY);
-        });
-        // Salvar scroll antes de navegar (links de ordenação)
-        document.querySelectorAll('a[href*="sort="]').forEach(a => {
-            a.addEventListener('click', () => sessionStorage.setItem(SCROLL_KEY, window.scrollY));
-        });
+        // ── Scroll Restore (Gerenciado Globalmente no common.js) ──────
 
         // ── Configurações persistentes ────────────────────────────────
         function saveSettings() {

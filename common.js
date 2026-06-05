@@ -147,3 +147,37 @@ function copiarSelecionados() {
     
     copiar(textoFinal.trim(), `${checks.length} conta(s) copiada(s)!`);
 }
+
+// ── Global Scroll Preservation ────────────────────────────────
+(function() {
+    const PATH = window.location.pathname;
+    
+    // Restaurar scroll
+    window.addEventListener('DOMContentLoaded', () => {
+        const saved = sessionStorage.getItem('global_scroll_y_' + PATH);
+        if (saved !== null) {
+            requestAnimationFrame(() => {
+                window.scrollTo({ top: parseInt(saved, 10), behavior: 'instant' });
+                sessionStorage.removeItem('global_scroll_y_' + PATH);
+            });
+        }
+    });
+
+    // Salvar scroll ao descarregar (antes de submits e recarregamentos)
+    window.addEventListener('beforeunload', () => {
+        sessionStorage.setItem('global_scroll_y_' + PATH, window.scrollY);
+    });
+
+    // Limpar scroll salvo ao navegar explicitamente pelo navbar
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('nav a, header a, a.nav-link').forEach(link => {
+            link.addEventListener('click', () => {
+                sessionStorage.removeItem('global_scroll_y_' + PATH);
+                try {
+                    const url = new URL(link.href);
+                    sessionStorage.removeItem('global_scroll_y_' + url.pathname);
+                } catch(e) {}
+            });
+        });
+    });
+})();

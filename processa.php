@@ -326,7 +326,37 @@ switch ($acao) {
             $_POST['pais_padrao'], $_POST['email_prefixo'], $_POST['email_dominio']
         ]);
         break;
-}
+
+    case 'add_desconto':
+        // Migração automática
+        try { $pdo->query("SELECT id FROM descontos LIMIT 1"); } catch (Exception $e) {
+            $pdo->query("CREATE TABLE IF NOT EXISTS `descontos` (
+                `id` int(11) NOT NULL AUTO_INCREMENT,
+                `pessoa_id` int(11) NOT NULL,
+                `mes` varchar(7) NOT NULL,
+                `motivo` varchar(255) NOT NULL,
+                `valor` decimal(10,2) NOT NULL,
+                `criado_em` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (`id`),
+                KEY `pessoa_id` (`pessoa_id`),
+                CONSTRAINT `descontos_ibfk_1` FOREIGN KEY (`pessoa_id`) REFERENCES `pessoas` (`id`) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        }
+        $pessoa_id = filter_input(INPUT_POST, 'pessoa_id', FILTER_VALIDATE_INT);
+        $mes       = preg_replace('/[^0-9\-]/', '', $_POST['mes'] ?? '');
+        $motivo    = trim($_POST['motivo'] ?? '');
+        $valor     = filter_input(INPUT_POST, 'valor', FILTER_VALIDATE_FLOAT);
+        if ($pessoa_id && $mes && $motivo && $valor > 0) {
+            $pdo->prepare("INSERT INTO descontos (pessoa_id, mes, motivo, valor) VALUES (?, ?, ?, ?)")
+                ->execute([$pessoa_id, $mes, $motivo, $valor]);
+        }
+        break;
+
+    case 'del_desconto':
+        $id = filter_input(INPUT_POST, 'desconto_id', FILTER_VALIDATE_INT);
+        if ($id) $pdo->prepare("DELETE FROM descontos WHERE id = ?")->execute([$id]);
+        break;
+
 
 header("Location: " . $voltar_para . (strpos($voltar_para, '?') !== false ? '&' : '?') . "msg=ok");
 exit;
