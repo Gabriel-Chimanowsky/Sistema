@@ -8,7 +8,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-$acao = filter_input(INPUT_POST, 'acao', FILTER_SANITIZE_SPECIAL_CHARS);
+$acao = filter_input(INPUT_POST, 'acao', FILTER_SANITIZE_SPECIAL_CHARS) ?: filter_input(INPUT_GET, 'acao', FILTER_SANITIZE_SPECIAL_CHARS);
 $voltar_para = $_SERVER['HTTP_REFERER'] ?? 'index.php';
 
 /**

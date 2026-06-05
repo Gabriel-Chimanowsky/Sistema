@@ -243,6 +243,7 @@ $valor_total_mes = max(0, ($total_geral_mes * $preco_unidade) - $total_descontos
                                             <span>R$ <?= $deu_ruim ? '0,00' : '20,00' ?></span>
                                             <!-- Botão de Dar Baixa / Tirar da Nota (oculto no print) -->
                                             <form action="processa.php?acao=toggle_nota" method="POST" class="inline no-print ml-2">
+                                                <input type="hidden" name="acao" value="toggle_nota">
                                                 <input type="hidden" name="conta_id" value="<?= $c['id'] ?>">
                                                 <button type="submit" class="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" title="<?= $deu_ruim ? 'Reintroduzir na cobrança' : 'Dar Baixa (Tirar da cobrança)' ?>">
                                                     <?php if ($deu_ruim): ?>
@@ -267,6 +268,7 @@ $valor_total_mes = max(0, ($total_geral_mes * $preco_unidade) - $total_descontos
                                                 <span><?= htmlspecialchars($desc['motivo']) ?></span>
                                                 <!-- Botão de Excluir Desconto (oculto no print) -->
                                                 <form action="processa.php?acao=del_desconto" method="POST" class="inline no-print ml-2" onsubmit="return confirm('Tem certeza que deseja remover este desconto?')">
+                                                    <input type="hidden" name="acao" value="del_desconto">
                                                     <input type="hidden" name="desconto_id" value="<?= $desc['id'] ?>">
                                                     <button type="submit" class="text-red-500 hover:text-red-700 p-1 rounded transition-colors" title="Remover Desconto">
                                                         <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
@@ -301,6 +303,7 @@ $valor_total_mes = max(0, ($total_geral_mes * $preco_unidade) - $total_descontos
 
             <!-- Formulário para Lançar Desconto (oculto no print) -->
             <form action="processa.php?acao=add_desconto" method="POST" class="no-print mt-6 p-6 bg-slate-50 dark:bg-slate-800/30 rounded-3xl border border-slate-200 dark:border-slate-850/50 flex flex-wrap items-end gap-4">
+                <input type="hidden" name="acao" value="add_desconto">
                 <input type="hidden" name="pessoa_id" value="<?= $d['id'] ?>">
                 <input type="hidden" name="mes" value="<?= $mes_filtro ?>">
                 <div class="flex-1 min-w-[200px]">
