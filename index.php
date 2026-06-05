@@ -84,6 +84,16 @@ $contasAdmin = $pdo->query("SELECT COUNT(*) FROM contas WHERE destinada_a IN (SE
 $contasPessoal = $pdo->query("SELECT COUNT(*) FROM contas WHERE destinada_a IS NOT NULL AND destinada_a NOT IN (SELECT id FROM pessoas WHERE nome LIKE '%administrador%')")->fetchColumn();
 $contasNaoProntas = $pdo->query("SELECT COUNT(*) FROM contas WHERE status IN ('pendente', 'criada')")->fetchColumn();
 $contasLivres = $totalContas - $contasNaoProntas - $contasPessoal - $contasAdmin;
+$contasFalhadas = $pdo->query("SELECT COUNT(*) FROM contas WHERE nome = 'User'")->fetchColumn();
+
+// Buscar domínio configurado
+$stmtConf = $pdo->query("SELECT email_dominio FROM configuracoes LIMIT 1");
+$config = $stmtConf->fetch();
+$email_dominio = $config['email_dominio'] ?? '@dollfinn';
+if (strpos($email_dominio, '@') !== 0) {
+    $email_dominio = '@' . $email_dominio;
+}
+
 
 
 // Listagem
@@ -165,6 +175,22 @@ function linkSort($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
     <?php include 'navbar.php'; ?>
 
     <main class="max-w-[1600px] mx-auto px-4 mt-24 space-y-6">
+        
+        <!-- Alerta de Contas Falhadas (User) -->
+        <?php if ($contasFalhadas > 0): ?>
+            <div class="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 p-6 rounded-[2rem] flex flex-wrap items-center justify-between gap-4 text-sm font-bold text-amber-800 dark:text-amber-400 shadow-sm">
+                <span class="flex items-center gap-3">
+                    <i data-lucide="alert-triangle" class="w-6 h-6 text-amber-500"></i>
+                    Atenção: Identificamos <?= $contasFalhadas ?> <?= $contasFalhadas == 1 ? 'conta que falhou' : 'contas que falharam' ?> na geração de dados aleatórios (ficando com o nome temporário "User").
+                </span>
+                <form method="POST" action="processa.php" class="inline">
+                    <input type="hidden" name="acao" value="regerar_todas_falhadas">
+                    <button type="submit" class="bg-amber-600 hover:bg-amber-700 text-white px-5 py-2.5 rounded-2xl shadow-lg shadow-amber-600/20 hover:scale-105 active:scale-95 transition-all text-xs font-black uppercase">
+                        Regerar Todas Agora
+                    </button>
+                </form>
+            </div>
+        <?php endif; ?>
         
         <!-- Stats Cards -->
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -270,7 +296,7 @@ function linkSort($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
                             <td class="p-4">
                                 <div class="flex flex-col">
                                     <span class="font-bold text-slate-800 dark:text-slate-200"><?= htmlspecialchars($conta['username']) ?></span>
-                                    <span class="text-xs text-slate-400">@dollfinn</span>
+                                    <span class="text-xs text-slate-400"><?= htmlspecialchars($email_dominio) ?></span>
                                 </div>
                             </td>
                             <td class="p-4">
@@ -581,7 +607,7 @@ function linkSort($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
 
                     <div class="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl px-3 py-1.5 gap-2">
                         <span class="text-[10px] font-black text-slate-400 uppercase">Qtd:</span>
-                        <input type="number" name="quantidade" value="1" min="1" max="50" class="bg-transparent w-10 text-sm font-bold outline-none text-center">
+                        <input type="number" name="quantidade" value="1" min="1" max="200" class="bg-transparent w-10 text-sm font-bold outline-none text-center">
                     </div>
 
                     <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-2 rounded-xl font-black text-sm shadow-xl shadow-blue-600/30 transition-all hover:scale-105 active:scale-95">

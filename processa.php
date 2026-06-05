@@ -42,6 +42,41 @@ function gerarNomeAleatorio($genero, $pais) {
     return ['nome' => $nome, 'sobrenome' => $sobrenome, 'username' => $username];
 }
 
+/**
+ * Gera múltiplos nomes aleatórios usando a API randomuser.me em uma única chamada.
+ */
+function gerarNomesAleatoriosMassa($genero, $pais, $quantidade) {
+    $generoApi = ($genero === 'mulher') ? 'female' : 'male';
+    $url = "https://randomuser.me/api/?gender={$generoApi}&nat={$pais}&results={$quantidade}";
+    
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); 
+    curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+    $json = curl_exec($ch);
+    curl_close($ch);
+
+    $dados = json_decode($json, true);
+    if (!$dados || !isset($dados['results']) || count($dados['results']) === 0) {
+        return [];
+    }
+
+    $usuarios = [];
+    foreach ($dados['results'] as $res) {
+        $nome = $res['name']['first'];
+        $sobrenome = $res['name']['last'];
+        
+        $nomeLimpo = iconv('UTF-8', 'ASCII//TRANSLIT', strtolower($nome));
+        $sobrenomeLimpo = iconv('UTF-8', 'ASCII//TRANSLIT', strtolower($sobrenome));
+        $username = preg_replace('/[^a-z0-9]/', '', $nomeLimpo) . '-' . preg_replace('/[^a-z0-9]/', '', $sobrenomeLimpo);
+        
+        $usuarios[] = ['nome' => $nome, 'sobrenome' => $sobrenome, 'username' => $username];
+    }
+
+    return $usuarios;
+}
+
 // Lógica de ações
 switch ($acao) {
     case 'exportar_csv':
@@ -219,10 +254,13 @@ switch ($acao) {
         $genero = $_POST['genero'] ?? $config['genero_padrao'];
         $pais = $_POST['pais'] ?? $config['pais_padrao'];
         $qtd = filter_input(INPUT_POST, 'quantidade', FILTER_VALIDATE_INT) ?: 1;
-        if ($qtd > 50) $qtd = 50; // Limite de segurança
+        if ($qtd > 200) $qtd = 200; // Limite de segurança aumentado para 200
+
+        // Obter todos os nomes de uma só vez para evitar rate limits
+        $nomesEmLote = gerarNomesAleatoriosMassa($genero, $pais, $qtd);
 
         for ($i = 0; $i < $qtd; $i++) {
-            $dados = gerarNomeAleatorio($genero, $pais);
+            $dados = $nomesEmLote[$i] ?? null;
             if (!$dados) {
                 $dados = ['nome' => 'User', 'sobrenome' => rand(100, 999), 'username' => 'user-' . rand(1000, 9999)];
             }
@@ -260,9 +298,6 @@ switch ($acao) {
                     }
                 }
             }
-            
-            // Pequeno delay para não sobrecarregar se for muitos
-            if ($qtd > 5) usleep(100000); 
         }
         sincronizarSlackTracker($pdo);
         break;
@@ -376,6 +411,20 @@ switch ($acao) {
         if ($id) {
             $pdo->prepare("UPDATE contas SET bm_criada = 1, data_bm_criada = NOW() WHERE id = ?")->execute([$id]);
             sincronizarSlackTracker($pdo);
+        }
+        break;
+
+    case 'regerar_todas_falhadas':
+        $contasFalhadas = $pdo->query("SELECT id, genero, pais FROM contas WHERE nome = 'User'")->fetchAll();
+        if (count($contasFalhadas) > 0) {
+            foreach ($contasFalhadas as $conta) {
+                $dados = gerarNomeAleatorio($conta['genero'], $conta['pais']);
+                if ($dados) {
+                    $pdo->prepare("UPDATE contas SET nome = ?, sobrenome = ?, username = ? WHERE id = ?")
+                        ->execute([$dados['nome'], $dados['sobrenome'], $dados['username'], $conta['id']]);
+                }
+                usleep(150000); // delay de 150ms para evitar rate limit
+            }
         }
         break;
 }
