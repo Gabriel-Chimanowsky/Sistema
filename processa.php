@@ -366,7 +366,7 @@ switch ($acao) {
             $pdo->prepare("UPDATE contas SET excluir_nota = 1 - excluir_nota WHERE id = ?")->execute([$id]);
         }
         break;
-
+}
 
 header("Location: " . $voltar_para . (strpos($voltar_para, '?') !== false ? '&' : '?') . "msg=ok");
 exit;
