@@ -120,6 +120,53 @@ if (!function_exists('buildRichText')) {
 }
 
 /**
+ * Retorna o título da semana contendo a data informada no formato do mês.
+ * A semana começa sempre no Domingo e termina no Sábado.
+ * A primeira semana do mês começa no dia 1 e vai até o primeiro Sábado.
+ * A última semana começa no último Domingo e termina no último dia do mês.
+ */
+if (!function_exists('obterSemanaDoMes')) {
+    function obterSemanaDoMes($timestamp = null) {
+        if ($timestamp === null) {
+            $timestamp = time();
+        }
+        $ano = date('Y', $timestamp);
+        $mes = date('m', $timestamp);
+        $diaAlvo = (int)date('d', $timestamp);
+        
+        $diasNoMes = (int)date('t', $timestamp);
+        
+        $semanaEncontrada = "";
+        $dia = 1;
+        
+        while ($dia <= $diasNoMes) {
+            $dataInicio = sprintf('%02d/%02d/%04d', $dia, $mes, $ano);
+            
+            $timestampDia = strtotime("{$ano}-{$mes}-" . sprintf('%02d', $dia));
+            $diaSemana = (int)date('w', $timestampDia); // 0 (Dom) a 6 (Sáb)
+            
+            $diasAteSabado = 6 - $diaSemana;
+            $diaFim = $dia + $diasAteSabado;
+            
+            if ($diaFim > $diasNoMes) {
+                $diaFim = $diasNoMes;
+            }
+            
+            $dataFim = sprintf('%02d/%02d/%04d', $diaFim, $mes, $ano);
+            
+            if ($diaAlvo >= $dia && $diaAlvo <= $diaFim) {
+                $semanaEncontrada = "Semana {$dataInicio} - {$dataFim}";
+                break;
+            }
+            
+            $dia = $diaFim + 1;
+        }
+        
+        return $semanaEncontrada;
+    }
+}
+
+/**
  * Realiza a sincronização automática das tarefas e lotes no Slack Lists.
  */
 if (!function_exists('sincronizarSlackTracker')) {
@@ -237,15 +284,7 @@ if (!function_exists('sincronizarSlackTracker')) {
             }
 
             // 4. Determinar o título da semana atual (Começando no sábado anterior e terminando na próxima sexta)
-            $w = (int)date('N');
-            $offsetFromSat = ($w >= 6) ? ($w - 6) : ($w + 1);
-
-            $satTimestamp = strtotime("-{$offsetFromSat} days");
-            $friTimestamp = strtotime("+" . (6 - $offsetFromSat) . " days");
-
-            $satStr = date('d/m/Y', $satTimestamp);
-            $friStr = date('d/m/Y', $friTimestamp);
-            $week_title = "Semana {$satStr} - {$friStr}";
+            $week_title = obterSemanaDoMes(time());
 
             // Obter itens da lista do Slack
             $chItems = curl_init("https://slack.com/api/slackLists.items.list");
