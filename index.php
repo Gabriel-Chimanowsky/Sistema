@@ -79,8 +79,8 @@ $contasAutenticadas = $pdo->query("SELECT COUNT(*) FROM contas WHERE status IN (
 // Novas estatísticas solicitadas pelo usuário
 $contasAdmin = $pdo->query("SELECT COUNT(*) FROM contas WHERE destinada_a IN (SELECT id FROM pessoas WHERE nome LIKE '%administrador%')")->fetchColumn();
 $contasPessoal = $pdo->query("SELECT COUNT(*) FROM contas WHERE destinada_a IS NOT NULL AND destinada_a NOT IN (SELECT id FROM pessoas WHERE nome LIKE '%administrador%')")->fetchColumn();
-$contasLivres = $pdo->query("SELECT COUNT(*) FROM contas WHERE destinada_a IS NULL")->fetchColumn();
 $contasNaoProntas = $pdo->query("SELECT COUNT(*) FROM contas WHERE status IN ('pendente', 'criada')")->fetchColumn();
+$contasLivres = $totalContas - $contasNaoProntas - $contasPessoal - $contasAdmin;
 
 
 // Listagem
