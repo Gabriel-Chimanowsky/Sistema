@@ -120,6 +120,27 @@ if (!function_exists('buildRichText')) {
 }
 
 /**
+ * Extrai o texto puro de um campo do Slack (seja texto simples, rich_text ou outros formatos).
+ */
+if (!function_exists('extrairTextoSlackField')) {
+    function extrairTextoSlackField($f) {
+        if (!empty($f['text'])) {
+            return $f['text'];
+        } elseif (!empty($f['text_value'])) {
+            return $f['text_value'];
+        } elseif (!empty($f['value']) && is_string($f['value'])) {
+            return $f['value'];
+        } elseif (!empty($f['rich_text'])) {
+            $extracted = '';
+            array_walk_recursive($f['rich_text'], function($val, $key) use (&$extracted) {
+                if ($key === 'text') $extracted .= $val;
+            });
+            return $extracted;
+        }
+        return '';
+    }
+}
+/**
  * Retorna o título da semana contendo a data informada no formato do mês.
  * A semana começa sempre no Domingo e termina no Sábado.
  * A primeira semana do mês começa no dia 1 e vai até o primeiro Sábado.
@@ -305,12 +326,12 @@ if (!function_exists('sincronizarSlackTracker')) {
             if ($itemsRes && isset($itemsRes['ok']) && $itemsRes['ok']) {
                 $items = $itemsRes['items'] ?? [];
                 foreach ($items as $item) {
-                    if (empty($item['parent_record_id'])) {
+                    if (empty($item['parent_item_id'])) {
                         $itemName = '';
                         if (isset($item['fields'])) {
                             foreach ($item['fields'] as $f) {
                                 if ($f['key'] === 'name' || $f['column_id'] === $primary_col_id) {
-                                    $itemName = $f['text'] ?? '';
+                                    $itemName = extrairTextoSlackField($f);
                                     break;
                                 }
                             }
@@ -361,11 +382,11 @@ if (!function_exists('sincronizarSlackTracker')) {
             if ($totalUnsynced >= 50) {
                 $loteCount = 0;
                 foreach ($items as $item) {
-                    if (isset($item['parent_record_id']) && $item['parent_record_id'] === $week_row_id) {
+                    if (isset($item['parent_item_id']) && $item['parent_item_id'] === $week_row_id) {
                         $subName = '';
                         foreach ($item['fields'] as $f) {
                             if ($f['key'] === 'name' || $f['column_id'] === $primary_col_id) {
-                                $subName = $f['text'] ?? '';
+                                $subName = extrairTextoSlackField($f);
                                 break;
                             }
                         }
@@ -422,11 +443,11 @@ if (!function_exists('sincronizarSlackTracker')) {
             if ($totalBmsUnsynced >= 50) {
                 $loteCountBm = 0;
                 foreach ($items as $item) {
-                    if (isset($item['parent_record_id']) && $item['parent_record_id'] === $week_row_id) {
+                    if (isset($item['parent_item_id']) && $item['parent_item_id'] === $week_row_id) {
                         $subName = '';
                         foreach ($item['fields'] as $f) {
                             if ($f['key'] === 'name' || $f['column_id'] === $primary_col_id) {
-                                $subName = $f['text'] ?? '';
+                                $subName = extrairTextoSlackField($f);
                                 break;
                             }
                         }
