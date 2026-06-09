@@ -395,34 +395,67 @@ function linkSort($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
                                 <?php elseif (in_array($conta['status'], ['autenticada', 'exportado'])): ?>
                                     <div class="text-[10px] mt-1 font-bold text-emerald-600">Vida: <?= $dias_vida ?> <?= $dias_vida == 1 ? 'dia' : 'dias' ?></div>
                                     
-                                    <!-- Bloco de BM -->
-                                    <div class="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-                                        <?php if ($conta['bm_criada'] == 1): 
-                                            $dias_bm = 0;
-                                            if (!empty($conta['data_bm_criada'])) {
-                                                $dias_bm = floor((time() - strtotime($conta['data_bm_criada'])) / 86400);
-                                            }
-                                        ?>
-                                            <span class="inline-flex items-center gap-1 text-[9px] font-black uppercase text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 rounded-lg">
-                                                <i data-lucide="check-square" class="w-3 h-3"></i>
-                                                BM Criada (<?= $dias_bm ?>d)
-                                            </span>
-                                        <?php else: ?>
-                                            <?php if ($dias_vida >= 7): ?>
-                                                <form method="POST" action="processa.php" class="inline-block">
-                                                    <input type="hidden" name="acao" value="criar_bm">
-                                                    <input type="hidden" name="conta_id" value="<?= $conta['id'] ?>">
-                                                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[9px] uppercase px-2 py-1 rounded-lg shadow-sm transition active:scale-95 flex items-center gap-1">
-                                                        <i data-lucide="plus-circle" class="w-2.5 h-2.5"></i>
-                                                        Criar BM
-                                                    </button>
-                                                </form>
-                                            <?php else: ?>
-                                                <span class="inline-block text-[9px] font-bold text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800/40 px-1.5 py-0.5 rounded-lg" title="Aguardando maturação de 7 dias">
-                                                    Maturando (falta <?= 7 - $dias_vida ?>d)
+                                    <!-- Bloco de BM e Página -->
+                                    <div class="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-1.5">
+                                        <!-- BM -->
+                                        <div class="flex items-center gap-2">
+                                            <?php if ($conta['bm_criada'] == 1): 
+                                                $dias_bm = 0;
+                                                if (!empty($conta['data_bm_criada'])) {
+                                                    $dias_bm = floor((time() - strtotime($conta['data_bm_criada'])) / 86400);
+                                                }
+                                            ?>
+                                                <span class="inline-flex items-center gap-1 text-[9px] font-black uppercase text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 rounded-lg">
+                                                    <i data-lucide="check-square" class="w-3 h-3"></i>
+                                                    BM Criada (<?= $dias_bm ?>d)
                                                 </span>
+                                            <?php else: ?>
+                                                <?php if ($dias_vida >= 7): ?>
+                                                    <form method="POST" action="processa.php" class="inline-block">
+                                                        <input type="hidden" name="acao" value="criar_bm">
+                                                        <input type="hidden" name="conta_id" value="<?= $conta['id'] ?>">
+                                                        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[9px] uppercase px-2 py-1 rounded-lg shadow-sm transition active:scale-95 flex items-center gap-1">
+                                                            <i data-lucide="plus-circle" class="w-2.5 h-2.5"></i>
+                                                            Criar BM
+                                                        </button>
+                                                    </form>
+                                                <?php else: ?>
+                                                    <span class="inline-block text-[9px] font-bold text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800/40 px-1.5 py-0.5 rounded-lg" title="Aguardando maturação de 7 dias">
+                                                        BM: Maturando (falta <?= 7 - $dias_vida ?>d)
+                                                    </span>
+                                                <?php endif; ?>
                                             <?php endif; ?>
-                                        <?php endif; ?>
+                                        </div>
+                                        
+                                        <!-- Página -->
+                                        <div class="flex items-center gap-2">
+                                            <?php if (isset($conta['pagina_criada']) && $conta['pagina_criada'] == 1): 
+                                                $dias_pag = 0;
+                                                if (!empty($conta['data_pagina_criada'])) {
+                                                    $dias_pag = floor((time() - strtotime($conta['data_pagina_criada'])) / 86400);
+                                                }
+                                            ?>
+                                                <span class="inline-flex items-center gap-1 text-[9px] font-black uppercase text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 px-2 py-0.5 rounded-lg">
+                                                    <i data-lucide="check-square" class="w-3 h-3"></i>
+                                                    Página Criada (<?= $dias_pag ?>d)
+                                                </span>
+                                            <?php else: ?>
+                                                <?php if ($dias_vida >= 7): ?>
+                                                    <form method="POST" action="processa.php" class="inline-block">
+                                                        <input type="hidden" name="acao" value="criar_pagina">
+                                                        <input type="hidden" name="conta_id" value="<?= $conta['id'] ?>">
+                                                        <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-[9px] uppercase px-2 py-1 rounded-lg shadow-sm transition active:scale-95 flex items-center gap-1">
+                                                            <i data-lucide="plus-circle" class="w-2.5 h-2.5"></i>
+                                                            Criar Página
+                                                        </button>
+                                                    </form>
+                                                <?php else: ?>
+                                                    <span class="inline-block text-[9px] font-bold text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800/40 px-1.5 py-0.5 rounded-lg" title="Aguardando maturação de 7 dias">
+                                                        Página: Maturando (falta <?= 7 - $dias_vida ?>d)
+                                                    </span>
+                                                <?php endif; ?>
+                                            <?php endif; ?>
+                                        </div>
                                     </div>
                                 <?php endif; ?>
                             </td>

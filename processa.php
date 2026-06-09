@@ -358,11 +358,12 @@ switch ($acao) {
         break;
 
     case 'atualizar_config':
-        $sql = "UPDATE configuracoes SET senha_padrao = ?, email_contador = ?, genero_padrao = ?, pais_padrao = ?, email_prefixo = ?, email_dominio = ?, slack_token = ?, slack_canal_notificacao = ?";
+        $sql = "UPDATE configuracoes SET senha_padrao = ?, email_contador = ?, genero_padrao = ?, pais_padrao = ?, email_prefixo = ?, email_dominio = ?, slack_token = ?, slack_canal_notificacao = ?, preco_perfil = ?, preco_bm = ?, preco_pagina = ?";
         $pdo->prepare($sql)->execute([
             $_POST['senha_padrao'], $_POST['email_contador'], $_POST['genero_padrao'], 
             $_POST['pais_padrao'], $_POST['email_prefixo'], $_POST['email_dominio'],
-            $_POST['slack_token'], $_POST['slack_canal_notificacao']
+            $_POST['slack_token'], $_POST['slack_canal_notificacao'],
+            $_POST['preco_perfil'], $_POST['preco_bm'], $_POST['preco_pagina']
         ]);
         break;
 
@@ -411,6 +412,13 @@ switch ($acao) {
         if ($id) {
             $pdo->prepare("UPDATE contas SET bm_criada = 1, data_bm_criada = NOW() WHERE id = ?")->execute([$id]);
             sincronizarSlackTracker($pdo);
+        }
+        break;
+
+    case 'criar_pagina':
+        $id = filter_input(INPUT_POST, 'conta_id', FILTER_VALIDATE_INT);
+        if ($id) {
+            $pdo->prepare("UPDATE contas SET pagina_criada = 1, data_pagina_criada = NOW() WHERE id = ?")->execute([$id]);
         }
         break;
 

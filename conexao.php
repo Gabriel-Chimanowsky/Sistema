@@ -50,6 +50,12 @@ try {
         if (!in_array('data_bm_criada', $colunasContas)) {
             $pdo->query("ALTER TABLE contas ADD COLUMN data_bm_criada DATETIME NULL");
         }
+        if (!in_array('pagina_criada', $colunasContas)) {
+            $pdo->query("ALTER TABLE contas ADD COLUMN pagina_criada TINYINT(1) NOT NULL DEFAULT 0");
+        }
+        if (!in_array('data_pagina_criada', $colunasContas)) {
+            $pdo->query("ALTER TABLE contas ADD COLUMN data_pagina_criada DATETIME NULL");
+        }
         if (!in_array('slack_perfil_sync', $colunasContas)) {
             $pdo->query("ALTER TABLE contas ADD COLUMN slack_perfil_sync TINYINT(1) NOT NULL DEFAULT 0");
         }
@@ -66,6 +72,15 @@ try {
         }
         if (!in_array('slack_canal_notificacao', $colunasConf)) {
             $pdo->query("ALTER TABLE configuracoes ADD COLUMN slack_canal_notificacao VARCHAR(100) NULL");
+        }
+        if (!in_array('preco_perfil', $colunasConf)) {
+            $pdo->query("ALTER TABLE configuracoes ADD COLUMN preco_perfil DECIMAL(10,2) NOT NULL DEFAULT 20.00");
+        }
+        if (!in_array('preco_bm', $colunasConf)) {
+            $pdo->query("ALTER TABLE configuracoes ADD COLUMN preco_bm DECIMAL(10,2) NOT NULL DEFAULT 30.00");
+        }
+        if (!in_array('preco_pagina', $colunasConf)) {
+            $pdo->query("ALTER TABLE configuracoes ADD COLUMN preco_pagina DECIMAL(10,2) NOT NULL DEFAULT 10.00");
         }
         
 

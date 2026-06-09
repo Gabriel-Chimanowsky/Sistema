@@ -5,7 +5,12 @@ checkAuth();
 
 // Pegar mês selecionado ou atual
 $mes_filtro = $_GET['mes'] ?? date('Y-m');
-$preco_unidade = 20;
+
+$stmtConf = $pdo->query("SELECT * FROM configuracoes LIMIT 1");
+$config = $stmtConf->fetch();
+$preco_unidade = $config['preco_perfil'] ?? 20.00;
+$preco_bm = $config['preco_bm'] ?? 30.00;
+$preco_pagina = $config['preco_pagina'] ?? 10.00;
 
 $meses_nomes = [
     '01' => 'Janeiro', '02' => 'Fevereiro', '03' => 'Março', '04' => 'Abril',
@@ -42,7 +47,8 @@ try {
 }
 
 // 1. Clientes COM movimentação no mês (faturamento considera apenas contas válidas/ativas)
-$sql_ativos = "SELECT p.id, p.nome, COALESCE(SUM(CASE WHEN c.excluir_nota = 0 THEN 1 ELSE 0 END), 0) as total 
+$sql_ativos = "SELECT p.id, p.nome, COALESCE(SUM(CASE WHEN c.excluir_nota = 0 THEN 1 ELSE 0 END), 0) as total,
+                COALESCE(SUM(CASE WHEN c.excluir_nota = 0 THEN {$preco_unidade} + IFNULL(c.bm_criada, 0) * {$preco_bm} + IFNULL(c.pagina_criada, 0) * {$preco_pagina} ELSE 0 END), 0) as valor_contas_total
                 FROM pessoas p 
                 INNER JOIN contas c ON p.id = c.destinada_a 
                 WHERE DATE_FORMAT(c.data_vinculo, '%Y-%m') = ?
@@ -67,8 +73,10 @@ $outros = $pdo->query($sql_outros)->fetchAll();
 
 // Estatísticas Gerais do Período
 $total_geral_mes = 0;
+$valor_bruto_contas = 0;
 foreach ($ativos as $at) {
     $total_geral_mes += $at['total'];
+    $valor_bruto_contas += $at['valor_contas_total'];
 }
 
 // 2. Descontos do período
@@ -83,7 +91,7 @@ $stmtTotalDescontos->execute([$mes_filtro]);
 $total_descontos_mes = (float)$stmtTotalDescontos->fetchColumn();
 
 // 3. Valor Total Líquido
-$valor_total_mes = max(0, ($total_geral_mes * $preco_unidade) - $total_descontos_mes);
+$valor_total_mes = max(0, $valor_bruto_contas - $total_descontos_mes);
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -179,7 +187,7 @@ $valor_total_mes = max(0, ($total_geral_mes * $preco_unidade) - $total_descontos
 
         <!-- LOOP DE IMPRESSÃO - UMA FOLHA POR PESSOA ATIVA -->
         <?php foreach ($ativos as $d): 
-            $stmtContas = $pdo->prepare("SELECT id, nome, sobrenome, email, data_vinculo, excluir_nota FROM contas WHERE destinada_a = ? AND DATE_FORMAT(data_vinculo, '%Y-%m') = ? ORDER BY data_vinculo ASC");
+            $stmtContas = $pdo->prepare("SELECT id, nome, sobrenome, email, data_vinculo, excluir_nota, bm_criada, pagina_criada FROM contas WHERE destinada_a = ? AND DATE_FORMAT(data_vinculo, '%Y-%m') = ? ORDER BY data_vinculo ASC");
             $stmtContas->execute([$d['id'], $mes_filtro]);
             $contas_pessoa = $stmtContas->fetchAll();
 
@@ -192,7 +200,7 @@ $valor_total_mes = max(0, ($total_geral_mes * $preco_unidade) - $total_descontos
             foreach ($descontos_pessoa as $desc) {
                 $total_descontos += $desc['valor'];
             }
-            $valor_contas = $d['total'] * $preco_unidade;
+            $valor_contas = $d['valor_contas_total'];
             $valor_final_pessoa = max(0, $valor_contas - $total_descontos);
         ?>
         <div class="bg-white dark:bg-slate-900 rounded-[2.5rem] p-10 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-10 print-break mb-10 client-card">
@@ -210,7 +218,8 @@ $valor_total_mes = max(0, ($total_geral_mes * $preco_unidade) - $total_descontos
                     <div class="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] mb-1">Total a Pagar</div>
                     <div class="text-3xl font-black text-blue-600">R$ <?= number_format($valor_final_pessoa, 2, ',', '.') ?></div>
                     <div class="text-[10px] font-bold text-slate-400 italic">
-                        <?= $d['total'] ?> contas x R$ 20,00
+                        <?= $d['total'] ?> contas
+
                         <?php if ($total_descontos > 0): ?>
                             (- R$ <?= number_format($total_descontos, 2, ',', '.') ?> desc.)
                         <?php endif; ?>
@@ -240,7 +249,12 @@ $valor_total_mes = max(0, ($total_geral_mes * $preco_unidade) - $total_descontos
                                     <td class="p-4 font-bold text-blue-500 <?= $deu_ruim ? 'text-slate-450 dark:text-slate-500' : '' ?>"><?= htmlspecialchars($c['email']) ?></td>
                                     <td class="p-4 text-right font-black">
                                         <div class="flex items-center justify-end gap-2">
-                                            <span>R$ <?= $deu_ruim ? '0,00' : '20,00' ?></span>
+                                            <?php
+                                                $valor_item = $preco_unidade;
+                                                if (isset($c['bm_criada']) && $c['bm_criada'] == 1) $valor_item += $preco_bm;
+                                                if (isset($c['pagina_criada']) && $c['pagina_criada'] == 1) $valor_item += $preco_pagina;
+                                            ?>
+                                            <span>R$ <?= $deu_ruim ? '0,00' : number_format($valor_item, 2, ',', '.') ?></span>
                                             <!-- Botão de Dar Baixa / Tirar da Nota (oculto no print) -->
                                             <form action="processa.php?acao=toggle_nota" method="POST" class="inline no-print ml-2">
                                                 <input type="hidden" name="acao" value="toggle_nota">

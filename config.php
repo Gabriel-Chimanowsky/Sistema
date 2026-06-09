@@ -104,6 +104,31 @@ $config = $stmt->fetch();
                 </div>
             </div>
 
+            <!-- Nova Seção: Financeiro -->
+            <div class="border-t pt-10 dark:border-slate-800 grid grid-cols-1 md:grid-cols-3 gap-10">
+                <div class="space-y-6 md:col-span-3">
+                    <h3 class="text-xs font-black uppercase tracking-[0.2em] text-slate-400 border-b pb-2 dark:border-slate-800">Valores Financeiros (R$)</h3>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="space-y-2">
+                            <label class="block text-sm font-bold text-slate-500 uppercase tracking-wider ml-1">Preço Base do Perfil</label>
+                            <input type="number" step="0.01" name="preco_perfil" value="<?= htmlspecialchars($config['preco_perfil'] ?? '20.00') ?>" 
+                                class="w-full bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-blue-500 p-4 rounded-2xl outline-none transition-all font-bold">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="block text-sm font-bold text-slate-500 uppercase tracking-wider ml-1">Adicional BM</label>
+                            <input type="number" step="0.01" name="preco_bm" value="<?= htmlspecialchars($config['preco_bm'] ?? '30.00') ?>" 
+                                class="w-full bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-blue-500 p-4 rounded-2xl outline-none transition-all font-bold">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="block text-sm font-bold text-slate-500 uppercase tracking-wider ml-1">Adicional Página</label>
+                            <input type="number" step="0.01" name="preco_pagina" value="<?= htmlspecialchars($config['preco_pagina'] ?? '10.00') ?>" 
+                                class="w-full bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-blue-500 p-4 rounded-2xl outline-none transition-all font-bold">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Nova Seção: Integração Slack -->
             <div class="border-t pt-10 dark:border-slate-800 grid grid-cols-1 md:grid-cols-2 gap-10">
                 <div class="space-y-6">
