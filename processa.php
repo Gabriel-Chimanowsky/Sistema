@@ -422,6 +422,21 @@ switch ($acao) {
         }
         break;
 
+    case 'remover_bm':
+        $id = filter_input(INPUT_POST, 'conta_id', FILTER_VALIDATE_INT);
+        if ($id) {
+            $pdo->prepare("UPDATE contas SET bm_criada = 0, data_bm_criada = NULL WHERE id = ?")->execute([$id]);
+            sincronizarSlackTracker($pdo);
+        }
+        break;
+
+    case 'remover_pagina':
+        $id = filter_input(INPUT_POST, 'conta_id', FILTER_VALIDATE_INT);
+        if ($id) {
+            $pdo->prepare("UPDATE contas SET pagina_criada = 0, data_pagina_criada = NULL WHERE id = ?")->execute([$id]);
+        }
+        break;
+
     case 'regerar_todas_falhadas':
         $contasFalhadas = $pdo->query("SELECT id, genero, pais FROM contas WHERE nome = 'User'")->fetchAll();
         if (count($contasFalhadas) > 0) {

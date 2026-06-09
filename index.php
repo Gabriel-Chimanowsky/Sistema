@@ -405,10 +405,17 @@ function linkSort($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
                                                     $dias_bm = floor((time() - strtotime($conta['data_bm_criada'])) / 86400);
                                                 }
                                             ?>
-                                                <span class="inline-flex items-center gap-1 text-[9px] font-black uppercase text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 rounded-lg">
+                                                <div class="inline-flex items-center gap-1 text-[9px] font-black uppercase text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 pl-2 pr-1 py-0.5 rounded-lg">
                                                     <i data-lucide="check-square" class="w-3 h-3"></i>
                                                     BM Criada (<?= $dias_bm ?>d)
-                                                </span>
+                                                    <form method="POST" action="processa.php" class="inline" onsubmit="return confirm('Deseja desfazer a criação da BM?')">
+                                                        <input type="hidden" name="acao" value="remover_bm">
+                                                        <input type="hidden" name="conta_id" value="<?= $conta['id'] ?>">
+                                                        <button type="submit" class="hover:bg-blue-200 dark:hover:bg-blue-800 p-0.5 rounded text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition" title="Desfazer BM">
+                                                            <i data-lucide="x" class="w-2.5 h-2.5"></i>
+                                                        </button>
+                                                    </form>
+                                                </div>
                                             <?php else: ?>
                                                 <?php if ($dias_vida >= 7): ?>
                                                     <form method="POST" action="processa.php" class="inline-block">
@@ -435,10 +442,17 @@ function linkSort($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
                                                     $dias_pag = floor((time() - strtotime($conta['data_pagina_criada'])) / 86400);
                                                 }
                                             ?>
-                                                <span class="inline-flex items-center gap-1 text-[9px] font-black uppercase text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 px-2 py-0.5 rounded-lg">
+                                                <div class="inline-flex items-center gap-1 text-[9px] font-black uppercase text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 pl-2 pr-1 py-0.5 rounded-lg">
                                                     <i data-lucide="check-square" class="w-3 h-3"></i>
                                                     Página Criada (<?= $dias_pag ?>d)
-                                                </span>
+                                                    <form method="POST" action="processa.php" class="inline" onsubmit="return confirm('Deseja desfazer a criação da Página?')">
+                                                        <input type="hidden" name="acao" value="remover_pagina">
+                                                        <input type="hidden" name="conta_id" value="<?= $conta['id'] ?>">
+                                                        <button type="submit" class="hover:bg-purple-200 dark:hover:bg-purple-800 p-0.5 rounded text-purple-500 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 transition" title="Desfazer Página">
+                                                            <i data-lucide="x" class="w-2.5 h-2.5"></i>
+                                                        </button>
+                                                    </form>
+                                                </div>
                                             <?php else: ?>
                                                 <?php if ($dias_vida >= 7): ?>
                                                     <form method="POST" action="processa.php" class="inline-block">
