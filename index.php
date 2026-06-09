@@ -84,6 +84,7 @@ $contasAdmin = $pdo->query("SELECT COUNT(*) FROM contas WHERE destinada_a IN (SE
 $contasPessoal = $pdo->query("SELECT COUNT(*) FROM contas WHERE destinada_a IS NOT NULL AND destinada_a NOT IN (SELECT id FROM pessoas WHERE nome LIKE '%administrador%')")->fetchColumn();
 $contasNaoProntas = $pdo->query("SELECT COUNT(*) FROM contas WHERE status IN ('pendente', 'criada')")->fetchColumn();
 $contasLivres = $totalContas - $contasNaoProntas - $contasPessoal - $contasAdmin;
+$contasLivresComBm = $pdo->query("SELECT COUNT(*) FROM contas WHERE (destinada_a IS NULL OR destinada_a = '' OR destinada_a = 0) AND status NOT IN ('pendente', 'criada') AND bm_criada = 1")->fetchColumn();
 $contasFalhadas = $pdo->query("SELECT COUNT(*) FROM contas WHERE nome = 'User'")->fetchColumn();
 
 // Buscar domínio configurado
@@ -232,7 +233,7 @@ function linkSort($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
             </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div class="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
                 <div>
                     <p class="text-slate-500 text-sm font-semibold uppercase tracking-wider">Uso por Pessoal</p>
@@ -258,6 +259,15 @@ function linkSort($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
                 </div>
                 <div class="w-12 h-12 bg-sky-100 dark:bg-sky-900/30 rounded-2xl flex items-center justify-center text-sky-600 dark:text-sky-400">
                     <i data-lucide="unlock" class="w-6 h-6"></i>
+                </div>
+            </div>
+            <div class="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-slate-500 text-sm font-semibold uppercase tracking-wider">Livres com BM</p>
+                    <h3 class="text-3xl font-black mt-1"><?= $contasLivresComBm ?></h3>
+                </div>
+                <div class="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-2xl flex items-center justify-center text-blue-600 dark:text-blue-400">
+                    <i data-lucide="check-square" class="w-6 h-6"></i>
                 </div>
             </div>
         </div>
@@ -300,7 +310,16 @@ function linkSort($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
                                 </div>
                             </td>
                             <td class="p-4">
-                                <span class="font-medium"><?= htmlspecialchars($conta['nome'] . ' ' . $conta['sobrenome']) ?></span>
+                                <div class="flex flex-col gap-1">
+                                    <div class="flex items-center gap-2 group/copy-nome">
+                                        <span class="font-medium"><?= htmlspecialchars($conta['nome']) ?></span>
+                                        <button onclick="copiar('<?= addslashes($conta['nome']) ?>', 'Nome copiado')" class="opacity-0 group-hover/copy-nome:opacity-100 transition"><i data-lucide="copy" class="w-3 h-3 text-slate-400 hover:text-blue-500"></i></button>
+                                    </div>
+                                    <div class="flex items-center gap-2 group/copy-sobrenome">
+                                        <span class="font-medium text-slate-500"><?= htmlspecialchars($conta['sobrenome']) ?></span>
+                                        <button onclick="copiar('<?= addslashes($conta['sobrenome']) ?>', 'Sobrenome copiado')" class="opacity-0 group-hover/copy-sobrenome:opacity-100 transition"><i data-lucide="copy" class="w-3 h-3 text-slate-400 hover:text-blue-500"></i></button>
+                                    </div>
+                                </div>
                             </td>
                             <td class="p-4">
                                 <div class="flex items-center gap-2 group/copy">
@@ -310,9 +329,10 @@ function linkSort($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
                             </td>
                             <td class="p-4">
                                 <div class="flex flex-col gap-1">
-                                    <div class="flex items-center gap-2 text-xs font-mono">
+                                    <div class="flex items-center gap-2 text-xs font-mono group/copy-senha">
                                         <span class="text-slate-400 w-10">SEN:</span>
                                         <span class="font-bold"><?= htmlspecialchars($conta['senha']) ?></span>
+                                        <button onclick="copiar('<?= addslashes($conta['senha']) ?>', 'Senha copiada')" class="opacity-0 group-hover/copy-senha:opacity-100 transition"><i data-lucide="copy" class="w-3 h-3 text-slate-400 hover:text-blue-500"></i></button>
                                     </div>
                                 </div>
                             </td>
@@ -421,6 +441,7 @@ function linkSort($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
                                 <div class="flex items-center justify-end gap-2">
                                     <button onclick="copiarContaUnica(this)" class="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition" title="Copiar Perfil"><i data-lucide="clipboard-copy" class="w-4 h-4"></i></button>
                                     <div class="w-px h-4 bg-slate-200 dark:border-slate-700"></div>
+                                    <button onclick="abrirModalEditarConta(<?= $conta['id'] ?>)" class="p-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition" title="Editar Conta"><i data-lucide="edit" class="w-4 h-4"></i></button>
                                     <button onclick="abrirModal('Regerar dados desta conta?', this.closest('tr').querySelector('.form-regerar'))" class="p-2 text-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg transition"><i data-lucide="refresh-cw" class="w-4 h-4"></i></button>
                                     <button onclick="abrirModal('Excluir conta permanentemente?', this.closest('tr').querySelector('.form-del'))" class="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                                     
@@ -642,6 +663,62 @@ function linkSort($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
         </div>
     </div>
 
+    <!-- Modal Editar Conta -->
+    <div id="modalEditarConta" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden transform scale-95 opacity-0 transition-all duration-300" id="modalEditarContaCard">
+            <div class="p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                <h3 class="text-lg font-black text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                    <i data-lucide="edit" class="w-5 h-5 text-blue-500"></i> Editar Conta <span id="editContaIdText" class="text-blue-500"></span>
+                </h3>
+                <button type="button" onclick="fecharModalEditarConta()" class="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 bg-slate-100 dark:bg-slate-800 rounded-xl transition">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+            <form method="POST" action="processa.php" class="p-6 space-y-4">
+                <input type="hidden" name="acao" value="editar_conta_completa">
+                <input type="hidden" name="conta_id" id="editContaId">
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-bold text-slate-500 uppercase">Nome</label>
+                        <input type="text" name="nome" id="editContaNome" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm outline-none focus:border-blue-500 transition">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-bold text-slate-500 uppercase">Sobrenome</label>
+                        <input type="text" name="sobrenome" id="editContaSobrenome" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm outline-none focus:border-blue-500 transition">
+                    </div>
+                </div>
+                
+                <div class="space-y-1">
+                    <label class="text-[10px] font-bold text-slate-500 uppercase">E-mail</label>
+                    <input type="text" name="email" id="editContaEmail" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm outline-none focus:border-blue-500 transition">
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-bold text-slate-500 uppercase">Usuário</label>
+                        <input type="text" name="username" id="editContaUsername" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm outline-none focus:border-blue-500 transition">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-bold text-slate-500 uppercase">Senha</label>
+                        <input type="text" name="senha" id="editContaSenha" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm outline-none focus:border-blue-500 transition">
+                    </div>
+                </div>
+                
+                <div class="space-y-1">
+                    <label class="text-[10px] font-bold text-slate-500 uppercase">2FA</label>
+                    <input type="text" name="codigo_2fa" id="editConta2fa" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm outline-none focus:border-blue-500 transition">
+                </div>
+                
+                <div class="space-y-1 pt-2">
+                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-blue-600/20 transition-all active:scale-95">
+                        Salvar Alterações
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
         lucide.createIcons();
         if (window.location.search.includes('msg=ok')) {
@@ -649,6 +726,43 @@ function linkSort($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
         }
 
         // ── Scroll Restore (Gerenciado Globalmente no common.js) ──────
+
+        function abrirModalEditarConta(id) {
+            const row = document.querySelector(`tr[data-id="${id}"]`);
+            if (!row) return;
+            const data = JSON.parse(row.dataset.json);
+            
+            document.getElementById('editContaId').value = data.id;
+            document.getElementById('editContaIdText').innerText = `#${data.id}`;
+            document.getElementById('editContaNome').value = data.nome || '';
+            document.getElementById('editContaSobrenome').value = data.sobrenome || '';
+            document.getElementById('editContaEmail').value = data.email || '';
+            document.getElementById('editContaUsername').value = data.username || '';
+            document.getElementById('editContaSenha').value = data.senha || '';
+            document.getElementById('editConta2fa').value = data.codigo_2fa || '';
+            
+            const modal = document.getElementById('modalEditarConta');
+            const card = document.getElementById('modalEditarContaCard');
+            
+            modal.classList.remove('hidden');
+            void modal.offsetWidth; // Force reflow
+            card.classList.remove('scale-95', 'opacity-0');
+            card.classList.add('scale-100', 'opacity-100');
+            
+            lucide.createIcons();
+        }
+
+        function fecharModalEditarConta() {
+            const modal = document.getElementById('modalEditarConta');
+            const card = document.getElementById('modalEditarContaCard');
+            
+            card.classList.remove('scale-100', 'opacity-100');
+            card.classList.add('scale-95', 'opacity-0');
+            
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300);
+        }
 
         // ── Configurações persistentes ────────────────────────────────
         function saveSettings() {

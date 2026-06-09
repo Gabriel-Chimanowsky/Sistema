@@ -427,6 +427,21 @@ switch ($acao) {
             }
         }
         break;
+
+    case 'editar_conta_completa':
+        $id = filter_input(INPUT_POST, 'conta_id', FILTER_VALIDATE_INT);
+        $nome = trim($_POST['nome'] ?? '');
+        $sobrenome = trim($_POST['sobrenome'] ?? '');
+        $email = trim($_POST['email'] ?? '');
+        $username = trim($_POST['username'] ?? '');
+        $senha = trim($_POST['senha'] ?? '');
+        $codigo_2fa = trim($_POST['codigo_2fa'] ?? '');
+        
+        if ($id) {
+            $pdo->prepare("UPDATE contas SET nome = ?, sobrenome = ?, email = ?, username = ?, senha = ?, codigo_2fa = ? WHERE id = ?")
+                ->execute([$nome, $sobrenome, $email, $username, $senha, $codigo_2fa, $id]);
+        }
+        break;
 }
 
 header("Location: " . $voltar_para . (strpos($voltar_para, '?') !== false ? '&' : '?') . "msg=ok");

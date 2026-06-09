@@ -396,7 +396,7 @@ if (!function_exists('sincronizarSlackTracker')) {
                     }
                 }
 
-                $startRange = $loteCount * 50;
+                $startRange = ($loteCount * 50) + 1;
                 $endRange = ($loteCount + 1) * 50;
                 $loteText = "{$startRange} - {$endRange} perfis {$nomeDominio}";
                 $hoje = date('Y-m-d');
@@ -457,7 +457,7 @@ if (!function_exists('sincronizarSlackTracker')) {
                     }
                 }
 
-                $startRangeBm = $loteCountBm * 50;
+                $startRangeBm = ($loteCountBm * 50) + 1;
                 $endRangeBm = ($loteCountBm + 1) * 50;
                 $loteTextBm = "{$startRangeBm} - {$endRangeBm} BMs {$nomeDominio}";
                 $hoje = date('Y-m-d');
