@@ -408,7 +408,7 @@ function linkSort($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
                                                 <div class="inline-flex items-center gap-1 text-[9px] font-black uppercase text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 pl-2 pr-1 py-0.5 rounded-lg">
                                                     <i data-lucide="check-square" class="w-3 h-3"></i>
                                                     BM Criada (<?= $dias_bm ?>d)
-                                                    <form method="POST" action="processa.php" class="inline" onsubmit="return confirm('Deseja desfazer a criação da BM?')">
+                                                    <form method="POST" action="processa.php" class="inline" onsubmit="event.preventDefault(); showConfirmCard('Desfazer BM', 'Deseja desfazer a criação da BM desta conta?', 'Desfazer BM', 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/30', () => this.submit());">
                                                         <input type="hidden" name="acao" value="remover_bm">
                                                         <input type="hidden" name="conta_id" value="<?= $conta['id'] ?>">
                                                         <button type="submit" class="hover:bg-blue-200 dark:hover:bg-blue-800 p-0.5 rounded text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition" title="Desfazer BM">
@@ -445,7 +445,7 @@ function linkSort($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
                                                 <div class="inline-flex items-center gap-1 text-[9px] font-black uppercase text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 pl-2 pr-1 py-0.5 rounded-lg">
                                                     <i data-lucide="check-square" class="w-3 h-3"></i>
                                                     Página Criada (<?= $dias_pag ?>d)
-                                                    <form method="POST" action="processa.php" class="inline" onsubmit="return confirm('Deseja desfazer a criação da Página?')">
+                                                    <form method="POST" action="processa.php" class="inline" onsubmit="event.preventDefault(); showConfirmCard('Desfazer Página', 'Deseja desfazer a criação da Página desta conta?', 'Desfazer Página', 'bg-purple-600 hover:bg-purple-700 shadow-purple-600/30', () => this.submit());">
                                                         <input type="hidden" name="acao" value="remover_pagina">
                                                         <input type="hidden" name="conta_id" value="<?= $conta['id'] ?>">
                                                         <button type="submit" class="hover:bg-purple-200 dark:hover:bg-purple-800 p-0.5 rounded text-purple-500 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 transition" title="Desfazer Página">

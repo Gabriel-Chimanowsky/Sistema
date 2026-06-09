@@ -8,6 +8,52 @@ function mostrarToast(msg) {
     setTimeout(() => t.classList.add('translate-y-32', 'opacity-0'), 3000);
 }
 
+function showConfirmCard(title, text, confirmLabel, confirmColorClass, onConfirm) {
+    // Se o modal já existe, remove
+    let existing = document.getElementById('customConfirmModal');
+    if (existing) existing.remove();
+
+    const colorClasses = confirmColorClass || 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/30';
+    
+    const html = `
+    <div id="customConfirmModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4 transition-opacity duration-200 opacity-0">
+        <div class="bg-white dark:bg-slate-900 rounded-3xl p-8 max-w-sm w-full shadow-2xl border border-slate-200 dark:border-slate-800 transform scale-95 transition-all duration-200" id="customConfirmContent">
+            <h3 class="text-xl font-black mb-3 text-slate-900 dark:text-white">${title}</h3>
+            <p class="text-slate-600 dark:text-slate-400 mb-8 font-medium">${text}</p>
+            <div class="flex justify-end gap-3">
+                <button type="button" id="btnCancelConfirm" class="px-5 py-2.5 rounded-xl font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 transition">Cancelar</button>
+                <button type="button" id="btnOkConfirm" class="px-5 py-2.5 rounded-xl font-bold text-white shadow-lg ${colorClasses} transition">${confirmLabel}</button>
+            </div>
+        </div>
+    </div>`;
+    
+    document.body.insertAdjacentHTML('beforeend', html);
+    const modal = document.getElementById('customConfirmModal');
+    const content = document.getElementById('customConfirmContent');
+    const btnCancel = document.getElementById('btnCancelConfirm');
+    const btnOk = document.getElementById('btnOkConfirm');
+
+    // Fade in
+    requestAnimationFrame(() => {
+        modal.classList.remove('opacity-0');
+        content.classList.remove('scale-95');
+        content.classList.add('scale-100');
+    });
+
+    const close = () => {
+        modal.classList.add('opacity-0');
+        content.classList.remove('scale-100');
+        content.classList.add('scale-95');
+        setTimeout(() => modal.remove(), 200);
+    };
+
+    btnCancel.addEventListener('click', close);
+    btnOk.addEventListener('click', () => {
+        close();
+        if(onConfirm) onConfirm();
+    });
+}
+
 function copiar(txt, msg) {
     if (!txt) return;
     if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -87,15 +133,17 @@ function executarAcaoLoteNavbar() {
 
     // Regerar
     if (acao === 'regerar') {
-        if (!confirm(`Regerar dados de ${checks.length} conta(s)?`)) return;
-        submitLote('regerar_massa', { ids });
+        showConfirmCard('Regerar Contas', `Deseja regerar os dados de ${checks.length} conta(s)?`, 'Sim, Regerar', 'bg-orange-500 hover:bg-orange-600 shadow-orange-500/30', () => {
+            submitLote('regerar_massa', { ids });
+        });
         return;
     }
 
     // Deletar
     if (acao === 'deletar') {
-        if (!confirm(`Excluir permanentemente ${checks.length} conta(s)?`)) return;
-        submitLote('del_massa', { ids });
+        showConfirmCard('Excluir Contas', `Tem certeza que deseja excluir permanentemente ${checks.length} conta(s)?`, 'Sim, Excluir', 'bg-red-600 hover:bg-red-700 shadow-red-600/30', () => {
+            submitLote('del_massa', { ids });
+        });
         return;
     }
 }
