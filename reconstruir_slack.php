@@ -71,6 +71,7 @@ foreach ($listasAntigas as $lista) {
 
 // Limpar banco de listas
 $pdo->query("TRUNCATE TABLE slack_listas");
+$pdo->query("TRUNCATE TABLE slack_lotes_count");
 echo "<br><span class='success'>✅ Banco de dados local de listas foi limpo com sucesso.</span></div>";
 
 // 2. Resetar status de sincronização de TODAS as contas
