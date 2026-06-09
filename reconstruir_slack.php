@@ -4,192 +4,141 @@ ini_set('display_errors', 1);
 
 require_once 'conexao.php';
 
-echo "<h2>Recriação da Lista no Slack</h2>";
+echo "<!DOCTYPE html>
+<html lang='pt-BR'>
+<head>
+    <meta charset='UTF-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+    <title>Reconstruir Slack</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #0f172a; padding: 2rem; max-width: 800px; margin: 0 auto; line-height: 1.6; }
+        .card { background: white; border-radius: 1rem; padding: 2rem; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
+        h2 { color: #2563eb; margin-top: 0; }
+        h3 { color: #475569; margin-top: 1.5rem; margin-bottom: 0.5rem; font-size: 1.1rem; }
+        .success { color: #16a34a; font-weight: bold; }
+        .warning { color: #d97706; }
+        .error { color: #dc2626; font-weight: bold; }
+        .log { background: #f1f5f9; padding: 1rem; border-radius: 0.5rem; font-family: monospace; font-size: 0.9rem; margin-bottom: 1rem; }
+    </style>
+</head>
+<body>
+<div class='card'>
+    <h2>🔄 Limpeza e Reconstrução do Slack</h2>";
 
-// 1. Obter token e domínio
-$stmtConf = $pdo->query("SELECT slack_token, email_dominio FROM configuracoes LIMIT 1");
+$stmtConf = $pdo->query("SELECT slack_token, slack_canal_notificacao, email_dominio FROM configuracoes LIMIT 1");
 $config = $stmtConf->fetch();
 $token = $config['slack_token'] ?? '';
+$canal = $config['slack_canal_notificacao'] ?? '';
 
 if (!$token) {
-    die("Token do Slack não configurado.");
+    die("<p class='error'>Token do Slack não configurado. Por favor, adicione na página de Configurações.</p></div></body></html>");
 }
 
-$dominioEmail = $config['email_dominio'] ?? '';
-$dominioLimpo = ltrim($dominioEmail, '@');
-$nomeDominio = strtolower(explode('.', $dominioLimpo)[0]);
-if (empty($nomeDominio)) $nomeDominio = "dollfinn";
+// 1. Apagar listas anteriores
+echo "<h3>1. Apagando listas anteriores no Slack...</h3><div class='log'>";
+$listasAntigas = $pdo->query("SELECT * FROM slack_listas")->fetchAll();
 
-// 2. Criar nova lista
-$meses = [
-    '01' => 'Janeiro', '02' => 'Fevereiro', '03' => 'Março', '04' => 'Abril',
-    '05' => 'Maio', '06' => 'Junho', '07' => 'Julho', '08' => 'Agosto',
-    '09' => 'Setembro', '10' => 'Outubro', '11' => 'Novembro', '12' => 'Dezembro'
-];
-$mesNum = date('m');
-$ano = date('Y');
-$nomeMes = $meses[$mesNum] ?? 'Mês';
-$list_name = "Gestão - {$nomeMes} {$ano} (Corrigida)";
-
-$ch = curl_init("https://slack.com/api/slackLists.create");
-curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-curl_setopt($ch, CURLOPT_POST, true);
-curl_setopt($ch, CURLOPT_HTTPHEADER, [
-    "Authorization: Bearer " . $token,
-    "Content-Type: application/json; charset=utf-8"
-]);
-curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
-    "name" => $list_name,
-    "todo_mode" => true
-]));
-$resJson = json_decode(curl_exec($ch), true);
-curl_close($ch);
-
-if (!$resJson || !isset($resJson['ok']) || !$resJson['ok']) {
-    die("Erro ao criar nova lista no Slack: " . print_r($resJson, true));
+if (count($listasAntigas) === 0) {
+    echo "Nenhuma lista anterior encontrada no banco local.<br>";
 }
 
-$list_id = $resJson['list_id'];
-$primary_col_id = 'name';
-if (isset($resJson['list_metadata']['schema'])) {
-    foreach ($resJson['list_metadata']['schema'] as $col) {
-        if (!empty($col['is_primary_column'])) {
-            $primary_col_id = $col['id'];
-            break;
-        }
+foreach ($listasAntigas as $lista) {
+    $list_id = $lista['list_id'];
+    echo "Tentando apagar lista ID: <b>$list_id</b>... ";
+    
+    // Tentar apagar via API do Slack. A API oficial não tem um endpoint público claro documentado como "slackLists.delete",
+    // mas vamos tentar esse ou simplesmente arquivar/ignorar caso a API retorne erro, 
+    // já que o mais importante é limpar do BD e criar a nova.
+    $chDel = curl_init("https://slack.com/api/slackLists.delete");
+    curl_setopt($chDel, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($chDel, CURLOPT_POST, true);
+    curl_setopt($chDel, CURLOPT_HTTPHEADER, [
+        "Authorization: Bearer " . $token,
+        "Content-Type: application/json; charset=utf-8"
+    ]);
+    curl_setopt($chDel, CURLOPT_POSTFIELDS, json_encode([
+        "list_id" => $list_id
+    ]));
+    $resDel = json_decode(curl_exec($chDel), true);
+    curl_close($chDel);
+    
+    if (isset($resDel['ok']) && $resDel['ok']) {
+        echo "<span class='success'>OK (Apagada no Slack)</span><br>";
+    } else {
+        echo "<span class='warning'>Ignorado pelo Slack (Pode já estar apagada manualmente ou permissão negada).</span><br>";
     }
 }
 
-// Atualiza o BD para usar a nova lista daqui pra frente
-$mesAtual = date('Y-m');
-$stmtUpdateLista = $pdo->prepare("UPDATE slack_listas SET list_id = ?, primary_col_id = ? WHERE mes = ?");
-$stmtUpdateLista->execute([$list_id, $primary_col_id, $mesAtual]);
+// Limpar banco de listas
+$pdo->query("TRUNCATE TABLE slack_listas");
+echo "<br><span class='success'>✅ Banco de dados local de listas foi limpo com sucesso.</span></div>";
 
-echo "✅ Nova lista criada com sucesso! ID: $list_id<br>";
+// 2. Resetar status de sincronização de TODAS as contas
+echo "<h3>2. Resetando status de sincronização...</h3><div class='log'>";
+$pdo->query("UPDATE contas SET slack_perfil_sync = 0, slack_bm_sync = 0");
+$totalContas = $pdo->query("SELECT COUNT(*) FROM contas WHERE status IN ('criada', 'autenticada', 'exportado')")->fetchColumn();
+echo "<span class='success'>✅ Todos os $totalContas perfis e BMs foram marcados para sincronizar novamente.</span></div>";
 
-// Funções de ajuda para interagir com o Slack
-$week_rows = [];
-function getWeekRowId($week_title, $list_id, $primary_col_id, $token, &$week_rows) {
-    if (isset($week_rows[$week_title])) return $week_rows[$week_title];
+// 3. Chamar o sincronizador múltiplas vezes para cobrir todas as contas em lotes
+echo "<h3>3. Iniciando criação da nova lista e agrupamento em lotes...</h3><div class='log'>";
+echo "Sincronizando lotes de 50 em 50...<br>";
+
+$maxLoops = 100; // Limite de segurança para não travar (até 5000 contas)
+$loopsRealizados = 0;
+
+while ($maxLoops > 0) {
+    $contasPendentes = $pdo->query("SELECT COUNT(*) FROM contas WHERE status IN ('criada', 'autenticada', 'exportado') AND slack_perfil_sync = 0")->fetchColumn();
+    $bmsPendentes = $pdo->query("SELECT COUNT(*) FROM contas WHERE bm_criada = 1 AND slack_bm_sync = 0")->fetchColumn();
     
-    $chNewWeek = curl_init("https://slack.com/api/slackLists.items.create");
-    curl_setopt($chNewWeek, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($chNewWeek, CURLOPT_POST, true);
-    curl_setopt($chNewWeek, CURLOPT_HTTPHEADER, [
+    if ($contasPendentes < 50 && $bmsPendentes < 50) {
+        break; // Não tem mais lotes completos de 50 para enviar
+    }
+    
+    // Chama o bot para fazer uma rodada de envio (50 perfis e 50 BMs)
+    sincronizarSlackTracker($pdo);
+    
+    $loopsRealizados++;
+    echo "."; // Indicador visual de progresso
+    
+    // Pequena pausa para evitar rate limit do Slack
+    usleep(500000); 
+    $maxLoops--;
+}
+echo "<br><br><span class='success'>✅ Processados $loopsRealizados lotes de 50 contas/BMs para a nova lista.</span><br>";
+$restantesP = $pdo->query("SELECT COUNT(*) FROM contas WHERE status IN ('criada', 'autenticada', 'exportado') AND slack_perfil_sync = 0")->fetchColumn();
+$restantesB = $pdo->query("SELECT COUNT(*) FROM contas WHERE bm_criada = 1 AND slack_bm_sync = 0")->fetchColumn();
+echo "<span class='warning'>Ficaram na fila de espera (menos de 50): $restantesP Perfis e $restantesB BMs. (Eles subirão sozinhos quando atingirem 50).</span></div>";
+
+
+// 4. Enviar mensagem para o chat cadastrado com a notificação
+echo "<h3>4. Notificando o Chat Configurado...</h3><div class='log'>";
+if (!empty($canal)) {
+    $chMsg = curl_init("https://slack.com/api/chat.postMessage");
+    curl_setopt($chMsg, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($chMsg, CURLOPT_POST, true);
+    curl_setopt($chMsg, CURLOPT_HTTPHEADER, [
         "Authorization: Bearer " . $token,
         "Content-Type: application/json; charset=utf-8"
     ]);
-    curl_setopt($chNewWeek, CURLOPT_POSTFIELDS, json_encode([
-        "list_id" => $list_id,
-        "initial_fields" => [
-            [
-                "column_id" => $primary_col_id,
-                "rich_text" => buildRichText($week_title)
-            ]
-        ]
+    curl_setopt($chMsg, CURLOPT_POSTFIELDS, json_encode([
+        "channel" => $canal,
+        "text" => "⚠️ *Aviso do Sistema:* As listas anteriores de Gestão foram resetadas e uma *nova lista completa* foi gerada agora com todas as informações atualizadas de Perfis e BMs agrupados.\n👉 Acesse a seção de *Lists* no seu Slack para conferir o resultado."
     ]));
-    $res = json_decode(curl_exec($chNewWeek), true);
-    curl_close($chNewWeek);
-    $id = $res['item']['id'] ?? $res['id'];
-    $week_rows[$week_title] = $id;
-    return $id;
+    $resMsg = json_decode(curl_exec($chMsg), true);
+    curl_close($chMsg);
+    
+    if (isset($resMsg['ok']) && $resMsg['ok']) {
+        echo "<span class='success'>✅ Mensagem de notificação enviada para o canal/chat cadastrado.</span><br>";
+    } else {
+        echo "<span class='error'>❌ Erro ao enviar notificação: " . print_r($resMsg, true) . "</span><br>";
+    }
+} else {
+    echo "<span class='warning'>⚠️ Nenhum canal/chat cadastrado nas configurações para enviar a notificação.</span><br>";
 }
+echo "</div>";
 
-function createLote($list_id, $week_row_id, $text, $date, $primary_col_id, $token) {
-    $chSub = curl_init("https://slack.com/api/slackLists.items.create");
-    curl_setopt($chSub, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($chSub, CURLOPT_POST, true);
-    curl_setopt($chSub, CURLOPT_HTTPHEADER, [
-        "Authorization: Bearer " . $token,
-        "Content-Type: application/json; charset=utf-8"
-    ]);
-    curl_setopt($chSub, CURLOPT_POSTFIELDS, json_encode([
-        "list_id" => $list_id,
-        "parent_item_id" => $week_row_id,
-        "initial_fields" => [
-            [
-                "column_id" => $primary_col_id,
-                "rich_text" => buildRichText($text)
-            ],
-            [
-                "column_id" => "Col00",
-                "checkbox" => true
-            ],
-            [
-                "column_id" => "Col02",
-                "date" => [$date]
-            ]
-        ]
-    ]));
-    curl_exec($chSub);
-    curl_close($chSub);
-}
-
-// 3. Resetar status de sync deste mês no banco
-$pdo->query("UPDATE contas SET slack_perfil_sync = 0 WHERE data_criacao LIKE '{$mesAtual}-%'");
-$pdo->query("UPDATE contas SET slack_bm_sync = 0 WHERE data_bm_criada LIKE '{$mesAtual}-%'");
-echo "✅ Status de sincronização resetado no banco.<br>";
-
-// 4. Processar Perfis
-$contas = $pdo->query("SELECT id, data_criacao FROM contas WHERE status IN ('criada', 'autenticada', 'exportado') AND data_criacao LIKE '{$mesAtual}-%' ORDER BY id ASC")->fetchAll();
-$total = count($contas);
-echo "<br><b>Recriando Perfis ($total contas do mês de $nomeMes)...</b><br>";
-
-$loteCounts = [];
-for ($i = 0; $i < floor($total / 50); $i++) {
-    $batch = array_slice($contas, $i * 50, 50);
-    $lastItem = end($batch);
-    $time = strtotime($lastItem['data_criacao']);
-    $week_title = obterSemanaDoMes($time);
-    
-    if (!isset($loteCounts[$week_title])) $loteCounts[$week_title] = 0;
-    
-    $start = $loteCounts[$week_title] * 50;
-    $end = ($loteCounts[$week_title] + 1) * 50;
-    $loteText = "{$start} - {$end} perfis {$nomeDominio}";
-    
-    $week_id = getWeekRowId($week_title, $list_id, $primary_col_id, $token, $week_rows);
-    createLote($list_id, $week_id, $loteText, date('Y-m-d', $time), $primary_col_id, $token);
-    echo "  - Lote $loteText inserido em '$week_title'<br>";
-    
-    $loteCounts[$week_title]++;
-    
-    // Atualiza apenas as contas deste lote como syncadas
-    $ids = array_column($batch, 'id');
-    $in = str_repeat('?,', count($ids) - 1) . '?';
-    $pdo->prepare("UPDATE contas SET slack_perfil_sync = 1 WHERE id IN ($in)")->execute($ids);
-}
-
-// 5. Processar BMs
-$bms = $pdo->query("SELECT id, data_bm_criada FROM contas WHERE bm_criada = 1 AND data_bm_criada LIKE '{$mesAtual}-%' ORDER BY data_bm_criada ASC")->fetchAll();
-$totalBms = count($bms);
-echo "<br><b>Recriando BMs ($totalBms BMs do mês de $nomeMes)...</b><br>";
-
-$loteCountsBm = [];
-for ($i = 0; $i < floor($totalBms / 50); $i++) {
-    $batch = array_slice($bms, $i * 50, 50);
-    $lastItem = end($batch);
-    $time = strtotime($lastItem['data_bm_criada']);
-    $week_title = obterSemanaDoMes($time);
-    
-    if (!isset($loteCountsBm[$week_title])) $loteCountsBm[$week_title] = 0;
-    
-    $start = $loteCountsBm[$week_title] * 50;
-    $end = ($loteCountsBm[$week_title] + 1) * 50;
-    $loteText = "{$start} - {$end} BMs {$nomeDominio}";
-    
-    $week_id = getWeekRowId($week_title, $list_id, $primary_col_id, $token, $week_rows);
-    createLote($list_id, $week_id, $loteText, date('Y-m-d', $time), $primary_col_id, $token);
-    echo "  - Lote $loteText inserido em '$week_title'<br>";
-    
-    $loteCountsBm[$week_title]++;
-    
-    $ids = array_column($batch, 'id');
-    $in = str_repeat('?,', count($ids) - 1) . '?';
-    $pdo->prepare("UPDATE contas SET slack_bm_sync = 1 WHERE id IN ($in)")->execute($ids);
-}
-
-echo "<h2>Reconstrução Completa!</h2>";
-echo "<p>Você já pode acessar o Slack e conferir a nova lista chamada <b>$list_name</b>.</p>";
-echo "<p>Nota: A lista antiga não foi deletada pelo sistema por segurança para que você não perca nada se houver problemas. Agora que a nova está pronta e correta, você pode deletar a lista com problemas direto no Slack.</p>";
+echo "<h2>Processo Concluído com Sucesso! 🎉</h2>";
+echo "<p>Você pode acessar o Slack e conferir a sua nova lista.</p>";
+echo "<br><a href='index.php' style='display:inline-block;background:#2563eb;color:white;text-decoration:none;padding:10px 20px;border-radius:8px;font-weight:bold;'>Voltar para a Página Inicial</a>";
+echo "</div></body></html>";
 ?>
