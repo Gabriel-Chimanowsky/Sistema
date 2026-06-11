@@ -97,8 +97,24 @@ switch ($acao) {
 
         $planilha = [];
         $planilha[] = ['Profile Title', 'Username', 'Password', '2FA Key', 'Cookie', 'Proxy Method', 'Proxy ID', 'Country', 'Proxy Type', 'Proxy Info', 'Enable System Proxy', 'Profile Notes', 'Tag Management', 'Open The Specified URL', 'UA(User Agent)'];
-        $planilha[] = ['Please enter profile title', 'Open browser...', 'Open browser...', 'Fill in 2FA...', 'Cookies JSON', '1 or 2 or 3', 'Proxy ID', 'Country Code', 'Type:Noproxy...', 'Format:Host:Port...', '1:Global 2:Enable 3:Close', '', '0 or 1', 'URLs...', 'UA Info...'];
-        $planilha[] = ["Note: Data from 4th line.", '', '', '', '', '', '', '', '', '', '', '', '', '', ''];
+        $planilha[] = [
+            'Please enter profile title',
+            'Open the browser profile, the username for designative platform/URL will be autofilled',
+            'Open the browser profile, the password for designative platform/URL will be autofilled',
+            'Fill in the 2FA Key to generate a secondary verification code for the website, similar to Google Authenticator.',
+            'Support cookies in JSON format',
+            "Fill in 1 or 2 or 3\n1: Purchased Residential Proxy\n2:Custom\n3:Purchased Static Proxy",
+            "Purchased residential proxy ID or\nPurchasing static proxy ID\n(No need to fill in when the proxy method is 2)",
+            "Country code,\nplease refer to the Country Appendix for details\n(Enabled when the proxy method is 1, no need to fill in when choose other methods)",
+            "Type:Noproxy/Http/Https/Socks5\n(Can only fill in one type in one cell)",
+            "Format ->Proxy Host:Proxy Port:Proxy Account:Proxy Password\n(It is required when the proxy method is \"Custom\" and the proxy type is not \"Noproxy\" mode )",
+            "Use system proxy for connection\n1:Follow global settings\n2:Enable\n3:Close",
+            '',
+            "Fill in 0 or 1\n0:Open the specific websites every time\n1:Open the tab pages last closed",
+            "Optional\nMultiple URLs can be entered\nSpacing by newline",
+            "Optional\nUA information: enter the correct UA details, the system will automatically identify the platform, system and browser version, for example:\n(Mozilla/5.0 (Linux; Android 11; M2102K1AC) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.6723.58 Mobile Safari/537.36)"
+        ];
+        $planilha[] = ["Note: The data is entered from the 4th line. The above 3 lines do not need to be deleted or processed. The system will import from the 4th line by default.Please follow the instructions, otherwise the import will failed.", '', '', '', '', '', '', '', '', '', '', '', '', '', ''];
 
         foreach ($contasExport as $c) {
             $nomePerfil = trim($c['nome'] . ' ' . $c['sobrenome']) . ' #' . $c['id'];
