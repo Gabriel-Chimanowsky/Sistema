@@ -93,42 +93,135 @@ switch ($acao) {
         
         $contasExport = $stmt->fetchAll();
 
-        require_once 'SimpleXLSXGen.php';
+        // ---------------------------------------------------------------
+        // Exportar usando o Import_template.xlsx como base (compatível com
+        // ixBrowser). Copiamos o arquivo e injetamos as linhas de dados
+        // diretamente no XML via ZipArchive, preservando todos os estilos
+        // e metadados que o ixBrowser valida.
+        // ---------------------------------------------------------------
+        $templatePath = __DIR__ . '/excel exemplo/Import_template.xlsx';
+        $tmpFile = tempnam(sys_get_temp_dir(), 'ixb_') . '.xlsx';
+        copy($templatePath, $tmpFile);
 
-        $planilha = [];
-        $planilha[] = ['Profile Title', 'Username', 'Password', '2FA Key', 'Cookie', 'Proxy Method', 'Proxy ID', 'Country', 'Proxy Type', 'Proxy Info', 'Enable System Proxy', 'Profile Notes', 'Tag Management', 'Open The Specified URL', 'UA(User Agent)'];
-        $planilha[] = [
-            'Please enter profile title',
-            'Open the browser profile, the username for designative platform/URL will be autofilled',
-            'Open the browser profile, the password for designative platform/URL will be autofilled',
-            'Fill in the 2FA Key to generate a secondary verification code for the website, similar to Google Authenticator.',
-            'Support cookies in JSON format',
-            "Fill in 1 or 2 or 3\n1: Purchased Residential Proxy\n2:Custom\n3:Purchased Static Proxy",
-            "Purchased residential proxy ID or\nPurchasing static proxy ID\n(No need to fill in when the proxy method is 2)",
-            "Country code,\nplease refer to the Country Appendix for details\n(Enabled when the proxy method is 1, no need to fill in when choose other methods)",
-            "Type:Noproxy/Http/Https/Socks5\n(Can only fill in one type in one cell)",
-            "Format ->Proxy Host:Proxy Port:Proxy Account:Proxy Password\n(It is required when the proxy method is \"Custom\" and the proxy type is not \"Noproxy\" mode )",
-            "Use system proxy for connection\n1:Follow global settings\n2:Enable\n3:Close",
-            '',
-            "Fill in 0 or 1\n0:Open the specific websites every time\n1:Open the tab pages last closed",
-            "Optional\nMultiple URLs can be entered\nSpacing by newline",
-            "Optional\nUA information: enter the correct UA details, the system will automatically identify the platform, system and browser version, for example:\n(Mozilla/5.0 (Linux; Android 11; M2102K1AC) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.6723.58 Mobile Safari/537.36)"
-        ];
-        $planilha[] = ["Note: The data is entered from the 4th line. The above 3 lines do not need to be deleted or processed. The system will import from the 4th line by default.Please follow the instructions, otherwise the import will failed.", '', '', '', '', '', '', '', '', '', '', '', '', '', ''];
+        $zip = new ZipArchive();
+        if ($zip->open($tmpFile, ZipArchive::CREATE) !== true) {
+            // Fallback para SimpleXLSXGen se ZipArchive falhar
+            require_once 'SimpleXLSXGen.php';
+            $planilha = [['Profile Title','Username','Password','2FA Key','Cookie','Proxy Method','Proxy ID','Country','Proxy Type','Proxy Info','Enable System Proxy','Profile Notes','Tag Management','Open The Specified URL','UA(User Agent)']];
+            foreach ($contasExport as $c) {
+                $planilha[] = [trim($c['nome'].' '.$c['sobrenome']).' #'.$c['id'], $c['email'], $c['senha'], $c['codigo_2fa']??'', $c['cookies']??'', '2', '', '', 'Noproxy', '', '1', '', '', '', ''];
+            }
+            $xlsx = \Shuchkin\SimpleXLSXGen::fromArray($planilha);
+            $xlsx->downloadAs('Export_Contas_'.date('Y-m-d_H-i').'.xlsx');
+            exit;
+        }
+
+        // Ler o sharedStrings.xml atual do template
+        $ssXml = $zip->getFromName('xl/sharedStrings.xml');
+
+        // Contar quantas <si> já existem no template (índices 0..N-1)
+        $existingCount = substr_count($ssXml, '<si>');
+
+        // Função auxiliar: escapa XML e constrói <si><t>...</t></si>
+        // Strings com espaços no início/fim precisam do atributo xml:space="preserve"
+        $buildSi = function(string $val): string {
+            $escaped = htmlspecialchars($val, ENT_XML1, 'UTF-8');
+            $attr = (strlen($val) > 0 && ($val[0] === ' ' || $val[strlen($val)-1] === ' ')) ? ' xml:space="preserve"' : '';
+            return "<si><t{$attr}>{$escaped}</t></si>";
+        };
+
+        // Montar as novas strings a adicionar (dados das contas)
+        $newStrings = [];
+        $rowsXml    = '';
+        $rowNum     = 4; // dados a partir da linha 4
 
         foreach ($contasExport as $c) {
             $nomePerfil = trim($c['nome'] . ' ' . $c['sobrenome']) . ' #' . $c['id'];
-            $planilha[] = [
-                $nomePerfil, $c['email'], $c['senha'], $c['codigo_2fa'] ?? '', $c['cookies'] ?? '',
-                '2', '', '', 'Noproxy', '', '1', '', '', '', ''
+            $rowValues  = [
+                $nomePerfil,
+                $c['email'],
+                $c['senha'],
+                $c['codigo_2fa'] ?? '',
+                $c['cookies']    ?? '',
+                '2',       // Proxy Method: Custom
+                '',        // Proxy ID
+                '',        // Country
+                'Noproxy', // Proxy Type
+                '',        // Proxy Info
+                '1',       // Enable System Proxy: Follow global
+                '',        // Profile Notes
+                '',        // Tag Management
+                '',        // Open URL
+                '',        // UA
             ];
-            
+
+            $cols = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O'];
+            $rowXml = "<row r=\"{$rowNum}\" spans=\"1:15\">";
+            foreach ($rowValues as $i => $val) {
+                $col = $cols[$i];
+                $ref = $col . $rowNum;
+                if ($val === '') {
+                    // Célula vazia
+                    $rowXml .= "<c r=\"{$ref}\"/>";
+                } elseif (is_numeric($val) && strpos($val, '.') === false) {
+                    // Número inteiro — sem shared string
+                    $rowXml .= "<c r=\"{$ref}\"><v>{$val}</v></c>";
+                } else {
+                    // String — adiciona ao sharedStrings
+                    // Verifica se já está na lista nova
+                    $idx = array_search($val, $newStrings, true);
+                    if ($idx === false) {
+                        $newStrings[] = $val;
+                        $idx = count($newStrings) - 1;
+                    }
+                    $ssIdx = $existingCount + $idx;
+                    $rowXml .= "<c r=\"{$ref}\" t=\"s\"><v>{$ssIdx}</v></c>";
+                }
+            }
+            $rowXml .= "</row>";
+            $rowsXml .= $rowXml;
+            $rowNum++;
+
             // Marcar como exportado
             $pdo->prepare("UPDATE contas SET status = 'exportado', data_exportado = NOW() WHERE id = ?")->execute([$c['id']]);
         }
 
-        $xlsx = \Shuchkin\SimpleXLSXGen::fromArray($planilha);
-        $xlsx->downloadAs('Export_Contas_' . date('Y-m-d_H-i') . '.xlsx');
+        // Atualizar sharedStrings.xml — adicionar novas strings antes do </sst>
+        if (!empty($newStrings)) {
+            $totalCount = $existingCount + count($newStrings);
+            $newSiBlocks = '';
+            foreach ($newStrings as $val) {
+                $newSiBlocks .= $buildSi($val);
+            }
+            // Atualizar count e uniqueCount no <sst>
+            $ssXml = preg_replace('/count="\d+"/', 'count="' . $totalCount . '"', $ssXml);
+            $ssXml = preg_replace('/uniqueCount="\d+"/', 'uniqueCount="' . $totalCount . '"', $ssXml);
+            // Inserir antes do fechamento </sst>
+            $ssXml = str_replace('</sst>', $newSiBlocks . '</sst>', $ssXml);
+            $zip->addFromString('xl/sharedStrings.xml', $ssXml);
+        }
+
+        // Atualizar sheet1.xml — inserir linhas de dados e atualizar dimension
+        $sheetXml = $zip->getFromName('xl/worksheets/sheet1.xml');
+
+        // Atualizar o atributo dimension (A1:O3 → A1:O{lastRow})
+        $lastRow  = $rowNum - 1;
+        $sheetXml = preg_replace('/ref="A1:O\d+"/', "ref=\"A1:O{$lastRow}\"", $sheetXml);
+
+        // Inserir as novas linhas antes de </sheetData>
+        $sheetXml = str_replace('</sheetData>', $rowsXml . '</sheetData>', $sheetXml);
+
+        $zip->addFromString('xl/worksheets/sheet1.xml', $sheetXml);
+        $zip->close();
+
+        // Servir o arquivo
+        $filename = 'Export_Contas_' . date('Y-m-d_H-i') . '.xlsx';
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Cache-Control: max-age=0');
+        header('Content-Length: ' . filesize($tmpFile));
+        readfile($tmpFile);
+        @unlink($tmpFile);
         exit;
 
     case 'mudar_status_massa':
