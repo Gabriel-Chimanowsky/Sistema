@@ -129,14 +129,32 @@ function linkSortApp($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
         <!-- Mensagens de Alerta -->
         <?php if (isset($_GET['msg'])): ?>
             <?php if ($_GET['msg'] === 'erro_duplicado'): ?>
-                <div class="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 p-4 rounded-2xl text-sm font-bold text-red-800 dark:text-red-400 flex items-center gap-2">
+                <div class="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 p-4 rounded-2xl text-sm font-bold text-red-800 dark:text-red-400 flex items-center gap-2 shadow-sm">
                     <i data-lucide="alert-circle" class="w-5 h-5 text-red-500"></i>
                     Erro: Já existe um aplicativo cadastrado com este ID do App (App ID).
                 </div>
             <?php elseif ($_GET['msg'] === 'erro_campos'): ?>
-                <div class="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 p-4 rounded-2xl text-sm font-bold text-red-800 dark:text-red-400 flex items-center gap-2">
+                <div class="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 p-4 rounded-2xl text-sm font-bold text-red-800 dark:text-red-400 flex items-center gap-2 shadow-sm">
                     <i data-lucide="alert-circle" class="w-5 h-5 text-red-500"></i>
                     Erro: Preencha todos os campos obrigatórios (Nome e ID do App).
+                </div>
+            <?php elseif ($_GET['msg'] === 'erro_token'): ?>
+                <div class="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 p-4 rounded-2xl text-sm font-bold text-red-800 dark:text-red-400 flex items-center gap-2 shadow-sm">
+                    <i data-lucide="alert-circle" class="w-5 h-5 text-red-500"></i>
+                    Erro: O token do Facebook não pode ser vazio.
+                </div>
+            <?php elseif ($_GET['msg'] === 'erro_api_facebook'): ?>
+                <div class="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 p-4 rounded-2xl text-sm font-bold text-red-800 dark:text-red-400 flex flex-col gap-1 shadow-sm">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="alert-circle" class="w-5 h-5 text-red-500"></i>
+                        <span>Erro na API do Facebook:</span>
+                    </div>
+                    <span class="text-xs font-mono pl-7 mt-1 font-medium bg-red-100/50 dark:bg-red-900/30 p-2 rounded-xl border border-red-200/50 text-red-700 dark:text-red-400"><?= htmlspecialchars($_GET['detalhe'] ?? '') ?></span>
+                </div>
+            <?php elseif ($_GET['msg'] === 'importacao_sucesso'): ?>
+                <div class="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/50 p-4 rounded-2xl text-sm font-bold text-emerald-800 dark:text-emerald-400 flex items-center gap-2 shadow-sm">
+                    <i data-lucide="check-circle" class="w-5 h-5 text-emerald-500"></i>
+                    Sucesso: Importado <?= (int)$_GET['novos'] ?> novos aplicativos e atualizado <?= (int)$_GET['atualizados'] ?> aplicativos existentes.
                 </div>
             <?php endif; ?>
         <?php endif; ?>
@@ -239,6 +257,10 @@ function linkSortApp($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
                 <button type="button" id="btnVerifyAll" onclick="verificarTodosApps()" class="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition active:scale-95 text-xs">
                     <i data-lucide="refresh-cw" id="iconVerifyAll" class="w-4 h-4"></i>
                     Verificar Todos
+                </button>
+                <button type="button" onclick="abrirModalImportar()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-emerald-600/20 transition active:scale-95 text-xs">
+                    <i data-lucide="facebook" class="w-4 h-4"></i>
+                    Conectar Facebook
                 </button>
                 <button type="button" onclick="abrirModalAdd()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-blue-600/20 transition active:scale-95 text-xs">
                     <i data-lucide="plus" class="w-4 h-4"></i>
@@ -439,15 +461,6 @@ function linkSortApp($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
                 </div>
 
                 <div class="space-y-1">
-                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider">Status no Meta *</label>
-                    <select name="status" id="formAppStatus" class="w-full bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-700 p-3.5 rounded-2xl outline-none focus:border-blue-500 font-bold">
-                        <option value="analise">Em Análise</option>
-                        <option value="aprovado">Aprovado</option>
-                        <option value="rejeitado">Rejeitado</option>
-                    </select>
-                </div>
-
-                <div class="space-y-1">
                     <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider">Observações / Anotações</label>
                     <textarea name="observacao" id="formAppObs" placeholder="Ex: Utilizado na campanha X, vinculado à conta Y..." rows="2" 
                         class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-3.5 rounded-2xl outline-none focus:border-blue-500 font-medium transition"></textarea>
@@ -456,6 +469,48 @@ function linkSortApp($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
                 <div class="flex gap-3 pt-4 border-t border-slate-100 dark:border-slate-855">
                     <button type="button" onclick="fecharModalApp()" class="flex-1 px-5 py-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-2xl font-bold transition">Cancelar</button>
                     <button type="submit" class="flex-1 px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold shadow-lg shadow-blue-600/30 transition">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Conectar Facebook (Importar via Token) -->
+    <div id="modalImportar" class="hidden fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-[100] items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 max-w-lg w-full shadow-2xl border border-slate-200 dark:border-slate-800 transform scale-90 transition-all duration-200" id="modalImportarContent">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2">
+                    <i data-lucide="facebook" class="w-6 h-6 text-emerald-600"></i>
+                    <span>Conectar Facebook</span>
+                </h3>
+                <button type="button" onclick="fecharModalImportar()" class="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <form method="POST" action="processa.php" class="space-y-4">
+                <input type="hidden" name="acao" value="importar_apps_token">
+
+                <div class="space-y-1">
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider">User Access Token (Token de Acesso)</label>
+                    <textarea name="token" required placeholder="Cole seu token de acesso de desenvolvedor aqui..." rows="4" 
+                        class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-3.5 rounded-2xl outline-none focus:border-emerald-500 font-mono text-xs transition"></textarea>
+                </div>
+
+                <div class="bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/50 p-4 rounded-2xl text-[11px] leading-relaxed space-y-2 text-slate-600 dark:text-slate-400 font-medium">
+                    <p class="font-bold text-blue-800 dark:text-blue-400 flex items-center gap-1">
+                        <i data-lucide="info" class="w-3.5 h-3.5"></i> Como obter seu token?
+                    </p>
+                    <p>
+                        1. Acesse o <a href="https://developers.facebook.com/tools/explorer/" target="_blank" class="text-blue-600 hover:underline font-bold">Graph API Explorer</a> da Meta.<br>
+                        2. Clique em <strong>Generate Access Token</strong>.<br>
+                        3. Certifique-se de usar uma conta com acesso aos apps e cole o token acima.<br>
+                        <em>Obs: O sistema importará ou atualizará todos os apps automaticamente!</em>
+                    </p>
+                </div>
+
+                <div class="flex gap-3 pt-4 border-t border-slate-100 dark:border-slate-855">
+                    <button type="button" onclick="fecharModalImportar()" class="flex-1 px-5 py-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-2xl font-bold transition">Cancelar</button>
+                    <button type="submit" class="flex-1 px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-bold shadow-lg shadow-emerald-600/30 transition">Importar Apps</button>
                 </div>
             </form>
         </div>
@@ -502,6 +557,20 @@ function linkSortApp($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
         }
         function confirmarModal() { if(formAlvo) formAlvo.submit(); }
 
+        // ── Modal Importar via Token ──────────────────────────────
+        function abrirModalImportar() {
+            const m = document.getElementById('modalImportar');
+            m.classList.remove('hidden'); m.classList.add('flex');
+            setTimeout(() => document.getElementById('modalImportarContent').classList.remove('scale-90'), 10);
+            lucide.createIcons();
+        }
+
+        function fecharModalImportar() {
+            const m = document.getElementById('modalImportar');
+            document.getElementById('modalImportarContent').classList.add('scale-90');
+            setTimeout(() => { m.classList.add('hidden'); m.classList.remove('flex'); }, 200);
+        }
+
         // ── Modal Adicionar/Editar App ─────────────────────────────
         function abrirModalAdd() {
             document.getElementById('modalAppTitle').querySelector('span').innerText = "Adicionar Aplicativo";
@@ -511,7 +580,6 @@ function linkSortApp($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
             document.getElementById('formAppNome').value = "";
             document.getElementById('formAppId').value = "";
             document.getElementById('formAppSecret').value = "";
-            document.getElementById('formAppStatus').value = "analise";
             document.getElementById('formAppObs').value = "";
             
             const m = document.getElementById('modalApp');
@@ -528,7 +596,6 @@ function linkSortApp($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
             document.getElementById('formAppNome').value = app.nome;
             document.getElementById('formAppId').value = app.app_id;
             document.getElementById('formAppSecret').value = app.app_secret || '';
-            document.getElementById('formAppStatus').value = app.status;
             document.getElementById('formAppObs').value = app.observacao || '';
             
             const m = document.getElementById('modalApp');
@@ -561,6 +628,22 @@ function linkSortApp($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
             lucide.createIcons();
         }
 
+        // Atualizar estilos e valor do select de status de aprovação de forma dinâmica
+        function atualizarSelectStatusRow(row, status) {
+            const selectStatus = row.querySelector('select[name="novo_status"]');
+            if (selectStatus && status) {
+                selectStatus.value = status;
+                selectStatus.className = 'text-[10px] font-black uppercase px-3 py-1.5 rounded-full border-2 cursor-pointer outline-none transition-all dark:bg-slate-900';
+                if (status === 'analise') {
+                    selectStatus.classList.add('bg-amber-50', 'text-amber-600', 'border-amber-200', 'dark:bg-amber-900/20', 'dark:border-amber-800');
+                } else if (status === 'aprovado') {
+                    selectStatus.classList.add('bg-emerald-50', 'text-emerald-600', 'border-emerald-200', 'dark:bg-emerald-900/20', 'dark:border-emerald-800');
+                } else if (status === 'rejeitado') {
+                    selectStatus.classList.add('bg-rose-50', 'text-rose-600', 'border-rose-200', 'dark:bg-rose-900/20', 'dark:border-rose-800');
+                }
+            }
+        }
+
         // ── Verificação de Status com AJAX ──────────────────────────
         function verificarApp(id, btn) {
             const row = btn.closest('tr');
@@ -590,10 +673,10 @@ function linkSortApp($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
                 btn.classList.remove('pointer-events-none');
                 
                 if (res.sucesso) {
-                    const status = res.status_conexao;
+                    const statusConexao = res.status_conexao;
                     
                     // Atualiza a badge de status de conexão
-                    if (status === 'online') {
+                    if (statusConexao === 'online') {
                         containerStatus.innerHTML = `
                             <div class="inline-flex items-center gap-1.5 font-bold uppercase text-[10px] px-2.5 py-1 rounded-full border bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900">
                                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
@@ -610,6 +693,9 @@ function linkSortApp($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
                         `;
                         mostrarToast("ATENÇÃO: Aplicativo CAIU!");
                     }
+                    
+                    // Atualiza dinamicamente o status no Meta
+                    atualizarSelectStatusRow(row, res.status);
                     
                     // Atualiza data de validação
                     if (textVerifiedDate) {
@@ -645,10 +731,8 @@ function linkSortApp($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
                 const row = btn.closest('tr');
                 const id = row.dataset.id;
                 
-                // Scroll suave para a linha que está sendo verificada
                 row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 
-                // Aguarda a verificação de cada um para não estourar rate limit da API
                 await new Promise((resolve) => {
                     const icon = btn.querySelector('i');
                     btn.classList.add('pointer-events-none');
@@ -674,8 +758,8 @@ function linkSortApp($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
                         btn.classList.remove('pointer-events-none');
                         
                         if (res.sucesso) {
-                            const status = res.status_conexao;
-                            if (status === 'online') {
+                            const statusConexao = res.status_conexao;
+                            if (statusConexao === 'online') {
                                 containerStatus.innerHTML = `
                                     <div class="inline-flex items-center gap-1.5 font-bold uppercase text-[10px] px-2.5 py-1 rounded-full border bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900">
                                         <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
@@ -690,6 +774,9 @@ function linkSortApp($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
                                     </div>
                                 `;
                             }
+                            
+                            atualizarSelectStatusRow(row, res.status);
+                            
                             if (textVerifiedDate) {
                                 textVerifiedDate.innerText = res.data_verificacao;
                             }
@@ -703,7 +790,6 @@ function linkSortApp($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
                     });
                 });
                 
-                // Intervalo leve entre pings
                 await new Promise(r => setTimeout(r, 200));
             }
             
@@ -711,7 +797,6 @@ function linkSortApp($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
             iconAll.classList.remove('animate-spin', 'text-blue-500');
             mostrarToast("Verificação concluída com sucesso!");
             
-            // Recarregar a página após 1.5s para atualizar os contadores do topo com dados novos
             setTimeout(() => {
                 window.location.reload();
             }, 1500);
