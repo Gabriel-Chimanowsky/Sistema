@@ -408,7 +408,7 @@ function linkSortApp($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
         <div class="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 max-w-lg w-full shadow-2xl border border-slate-200 dark:border-slate-800 transform scale-90 transition-all duration-200" id="modalAppContent">
             <div class="flex items-center justify-between mb-6">
                 <h3 id="modalAppTitle" class="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2">
-                    <i data-lucide="plus-circle" class="w-6 h-6 text-blue-600"></i>
+                    <span id="modalAppTitleIcon"><i data-lucide="plus-circle" class="w-6 h-6 text-blue-600"></i></span>
                     <span>Adicionar Aplicativo</span>
                 </h3>
                 <button type="button" onclick="fecharModalApp()" class="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition">
@@ -505,7 +505,7 @@ function linkSortApp($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
         // ── Modal Adicionar/Editar App ─────────────────────────────
         function abrirModalAdd() {
             document.getElementById('modalAppTitle').querySelector('span').innerText = "Adicionar Aplicativo";
-            document.getElementById('modalAppTitle').querySelector('i').setAttribute('data-lucide', 'plus-circle');
+            document.getElementById('modalAppTitleIcon').innerHTML = '<i data-lucide="plus-circle" class="w-6 h-6 text-blue-600"></i>';
             document.getElementById('formAppAcao').value = "add_app";
             document.getElementById('formAppIdDb').value = "";
             document.getElementById('formAppNome').value = "";
@@ -522,7 +522,7 @@ function linkSortApp($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
 
         function abrirModalEditarApp(app) {
             document.getElementById('modalAppTitle').querySelector('span').innerText = "Editar Aplicativo";
-            document.getElementById('modalAppTitle').querySelector('i').setAttribute('data-lucide', 'edit');
+            document.getElementById('modalAppTitleIcon').innerHTML = '<i data-lucide="edit" class="w-6 h-6 text-blue-600"></i>';
             document.getElementById('formAppAcao').value = "edit_app";
             document.getElementById('formAppIdDb').value = app.id;
             document.getElementById('formAppNome').value = app.nome;
