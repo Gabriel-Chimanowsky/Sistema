@@ -702,8 +702,8 @@ switch ($acao) {
             exit;
         }
 
-        // Buscar a lista de apps do usuário via Graph API
-        $url = "https://graph.facebook.com/v19.0/me/applications?fields=id,name,development_mode&limit=100&access_token=" . urlencode($token);
+        // Buscar a lista de apps do usuário via Graph API (tentando assigned_applications primeiro)
+        $url = "https://graph.facebook.com/v19.0/me/assigned_applications?fields=id,name,development_mode&limit=100&access_token=" . urlencode($token);
         
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
@@ -714,8 +714,30 @@ switch ($acao) {
         curl_close($ch);
 
         $dados = json_decode($res, true);
+        
+        // Fallback para /me/applications caso ocorra erro no primeiro endpoint
+        if (!$dados || isset($dados['error'])) {
+            $urlFallback = "https://graph.facebook.com/v19.0/me/applications?fields=id,name,development_mode&limit=100&access_token=" . urlencode($token);
+            $ch2 = curl_init();
+            curl_setopt($ch2, CURLOPT_URL, $urlFallback);
+            curl_setopt($ch2, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch2, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch2, CURLOPT_TIMEOUT, 15);
+            $resFallback = curl_exec($ch2);
+            curl_close($ch2);
+            
+            $dadosFallback = json_decode($resFallback, true);
+            if ($dadosFallback && !isset($dadosFallback['error'])) {
+                $dados = $dadosFallback;
+            }
+        }
+
         if (!$dados || isset($dados['error'])) {
             $msgErro = $dados['error']['message'] ?? 'Erro desconhecido na API do Facebook.';
+            $errorCode = $dados['error']['code'] ?? 0;
+            if ($errorCode == 100) {
+                $msgErro .= " (Dica: Certifique-se de que o token possui a permissão 'manage_app_solution' ou adicione os aplicativos manualmente usando o botão 'Adicionar Aplicativo'.)";
+            }
             header("Location: apps.php?msg=erro_api_facebook&detalhe=" . urlencode($msgErro));
             exit;
         }
