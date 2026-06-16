@@ -104,6 +104,20 @@ try {
             PRIMARY KEY (`id`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
+        // 5. Tabela apps
+        $pdo->query("CREATE TABLE IF NOT EXISTS `apps` (
+            `id` INT(11) NOT NULL AUTO_INCREMENT,
+            `nome` VARCHAR(255) NOT NULL,
+            `app_id` VARCHAR(100) NOT NULL UNIQUE,
+            `app_secret` VARCHAR(255) NULL,
+            `status` ENUM('analise', 'aprovado', 'rejeitado') NOT NULL DEFAULT 'analise',
+            `status_conexao` ENUM('online', 'caiu') NOT NULL DEFAULT 'online',
+            `observacao` TEXT NULL,
+            `data_verificacao` DATETIME NULL,
+            `criado_em` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
     } catch (Exception $e) {
         // Silenciar erro em produção ou logar
     }

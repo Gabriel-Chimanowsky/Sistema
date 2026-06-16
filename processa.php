@@ -77,6 +77,65 @@ function gerarNomesAleatoriosMassa($genero, $pais, $quantidade) {
     return $usuarios;
 }
 
+/**
+ * Verifica o status de um app da Meta (Facebook Graph API)
+ * Retorna 'online' ou 'caiu'
+ */
+function verificarAppStatusMeta($app_id, $app_secret = null) {
+    $app_id = trim($app_id);
+    if (empty($app_id)) {
+        return 'caiu';
+    }
+
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+    curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+
+    if (!empty($app_secret)) {
+        // Chamada autenticada com App Access Token (APP_ID|APP_SECRET)
+        $token = urlencode($app_id . '|' . trim($app_secret));
+        $url = "https://graph.facebook.com/v19.0/" . urlencode($app_id) . "?fields=id,name,active&access_token=" . $token;
+        curl_setopt($ch, CURLOPT_URL, $url);
+        $res = curl_exec($ch);
+        curl_close($ch);
+
+        $dados = json_decode($res, true);
+        if ($dados && isset($dados['id'])) {
+            if (isset($dados['active']) && $dados['active'] === false) {
+                return 'caiu';
+            }
+            return 'online';
+        }
+        return 'caiu';
+    } else {
+        // Chamada pública para a Graph API
+        $url = "https://graph.facebook.com/v19.0/" . urlencode($app_id);
+        curl_setopt($ch, CURLOPT_URL, $url);
+        $res = curl_exec($ch);
+        curl_close($ch);
+
+        $dados = json_decode($res, true);
+        if ($dados && isset($dados['error'])) {
+            $errorCode = $dados['error']['code'] ?? 0;
+            // 104 = Access token required (indica que o app existe e está ativo)
+            // 190 = Invalid access token
+            // Outros erros como 100 ou 803 indicam que o app não existe/caiu
+            if ($errorCode == 104 || $errorCode == 190) {
+                return 'online';
+            }
+            return 'caiu';
+        }
+        
+        if ($dados && isset($dados['id'])) {
+            return 'online';
+        }
+
+        return 'caiu';
+    }
+}
+
 // Lógica de ações
 switch ($acao) {
     case 'exportar_csv':
@@ -572,6 +631,93 @@ switch ($acao) {
         if ($id) {
             $pdo->prepare("UPDATE contas SET nome = ?, sobrenome = ?, email = ?, username = ?, senha = ?, codigo_2fa = ? WHERE id = ?")
                 ->execute([$nome, $sobrenome, $email, $username, $senha, $codigo_2fa, $id]);
+        }
+        break;
+
+    case 'add_app':
+        $nome = trim($_POST['nome'] ?? '');
+        $app_id = trim($_POST['app_id'] ?? '');
+        $app_secret = trim($_POST['app_secret'] ?? '') ?: null;
+        $status = $_POST['status'] ?? 'analise';
+        $observacao = trim($_POST['observacao'] ?? '') ?: null;
+
+        if (empty($nome) || empty($app_id)) {
+            header("Location: apps.php?msg=erro_campos");
+            exit;
+        }
+
+        // Verificar se app_id já existe
+        $stmtCheck = $pdo->prepare("SELECT COUNT(*) FROM apps WHERE app_id = ?");
+        $stmtCheck->execute([$app_id]);
+        if ($stmtCheck->fetchColumn() > 0) {
+            header("Location: apps.php?msg=erro_duplicado");
+            exit;
+        }
+
+        $stmt = $pdo->prepare("INSERT INTO apps (nome, app_id, app_secret, status, status_conexao, observacao, data_verificacao) VALUES (?, ?, ?, ?, 'online', ?, NOW())");
+        $stmt->execute([$nome, $app_id, $app_secret, $status, $observacao]);
+        break;
+
+    case 'edit_app':
+        $id = filter_input(INPUT_POST, 'app_id_db', FILTER_VALIDATE_INT);
+        $nome = trim($_POST['nome'] ?? '');
+        $app_id = trim($_POST['app_id'] ?? '');
+        $app_secret = trim($_POST['app_secret'] ?? '') ?: null;
+        $status = $_POST['status'] ?? 'analise';
+        $observacao = trim($_POST['observacao'] ?? '') ?: null;
+
+        if ($id && !empty($nome) && !empty($app_id)) {
+            // Verificar duplicidade de app_id excluindo o próprio ID
+            $stmtCheck = $pdo->prepare("SELECT COUNT(*) FROM apps WHERE app_id = ? AND id != ?");
+            $stmtCheck->execute([$app_id, $id]);
+            if ($stmtCheck->fetchColumn() > 0) {
+                header("Location: apps.php?msg=erro_duplicado");
+                exit;
+            }
+
+            $stmt = $pdo->prepare("UPDATE apps SET nome = ?, app_id = ?, app_secret = ?, status = ?, observacao = ? WHERE id = ?");
+            $stmt->execute([$nome, $app_id, $app_secret, $status, $observacao, $id]);
+        }
+        break;
+
+    case 'del_app':
+        $id = filter_input(INPUT_POST, 'app_id', FILTER_VALIDATE_INT);
+        if ($id) {
+            $pdo->prepare("DELETE FROM apps WHERE id = ?")->execute([$id]);
+        }
+        break;
+
+    case 'verificar_app_status':
+        $id = filter_input(INPUT_POST, 'app_id', FILTER_VALIDATE_INT);
+        if ($id) {
+            $stmt = $pdo->prepare("SELECT app_id, app_secret FROM apps WHERE id = ?");
+            $stmt->execute([$id]);
+            $app = $stmt->fetch();
+            if ($app) {
+                $status_conexao = verificarAppStatusMeta($app['app_id'], $app['app_secret']);
+                
+                $stmtUp = $pdo->prepare("UPDATE apps SET status_conexao = ?, data_verificacao = NOW() WHERE id = ?");
+                $stmtUp->execute([$status_conexao, $id]);
+
+                // Se for requisição AJAX
+                if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
+                    header('Content-Type: application/json');
+                    echo json_encode([
+                        'sucesso' => true,
+                        'status_conexao' => $status_conexao,
+                        'data_verificacao' => date('d/m/Y H:i')
+                    ]);
+                    exit;
+                }
+            }
+        }
+        break;
+
+    case 'mudar_app_status_direto':
+        $id = filter_input(INPUT_POST, 'app_id', FILTER_VALIDATE_INT);
+        $novo_status = filter_input(INPUT_POST, 'novo_status', FILTER_SANITIZE_SPECIAL_CHARS);
+        if ($id && in_array($novo_status, ['analise', 'aprovado', 'rejeitado'])) {
+            $pdo->prepare("UPDATE apps SET status = ? WHERE id = ?")->execute([$novo_status, $id]);
         }
         break;
 }
