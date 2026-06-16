@@ -652,6 +652,7 @@ switch ($acao) {
         break;
 
     case 'verificar_app_status':
+        header('Content-Type: application/json');
         $id = filter_input(INPUT_POST, 'app_id', FILTER_VALIDATE_INT);
         if ($id) {
             $stmt = $pdo->prepare("SELECT app_id, app_secret, user_access_token, permissions, observacao FROM apps WHERE id = ?");
@@ -670,22 +671,19 @@ switch ($acao) {
                 $stmtUp = $pdo->prepare("UPDATE apps SET status_conexao = ?, status = ?, permissions_status = ?, observacao = ?, data_verificacao = NOW() WHERE id = ?");
                 $stmtUp->execute([$status_conexao, $status, $permissions_status, $obs, $id]);
 
-                // Se for requisição AJAX
-                if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
-                    header('Content-Type: application/json');
-                    echo json_encode([
-                        'sucesso' => true,
-                        'status_conexao' => $status_conexao,
-                        'status' => $status,
-                        'data_verificacao' => date('d/m/Y H:i'),
-                        'permissions' => $app['permissions'] ?? '',
-                        'permissions_status' => $permissions_status
-                    ]);
-                    exit;
-                }
+                echo json_encode([
+                    'sucesso' => true,
+                    'status_conexao' => $status_conexao,
+                    'status' => $status,
+                    'data_verificacao' => date('d/m/Y H:i'),
+                    'permissions' => $app['permissions'] ?? '',
+                    'permissions_status' => $permissions_status
+                ]);
+                exit;
             }
         }
-        break;
+        echo json_encode(['sucesso' => false, 'erro' => 'Aplicativo não encontrado.']);
+        exit;
 
     case 'mudar_app_status_direto':
         $id = filter_input(INPUT_POST, 'app_id', FILTER_VALIDATE_INT);
@@ -782,8 +780,26 @@ switch ($acao) {
         foreach ($appsImportados as $appData) {
             $app_id = $appData['id'];
             $nome = $appData['name'];
-            $devMode = !empty($appData['development_mode']);
-            $status = $devMode ? 'analise' : 'aprovado';
+            
+            $devMode = null;
+            if (isset($appData['development_mode'])) {
+                $devMode = (bool)$appData['development_mode'];
+            } else {
+                // Se o campo development_mode veio ausente na listagem em lote,
+                // fazemos uma chamada direta rápida no nó do app para obter o valor real
+                $detalheApp = $fbGet($app_id . "?fields=development_mode", $token);
+                if ($detalheApp && isset($detalheApp['development_mode'])) {
+                    $devMode = (bool)$detalheApp['development_mode'];
+                }
+            }
+            
+            if ($devMode === null) {
+                // Se não conseguimos obter de forma direta, chamamos a rotina unificada
+                $resultado = verificarAppStatusMeta($app_id, null, $token);
+                $status = $resultado['status'];
+            } else {
+                $status = $devMode ? 'analise' : 'aprovado';
+            }
 
             // Verificar se já existe
             $stmtCheck = $pdo->prepare("SELECT id FROM apps WHERE app_id = ?");
