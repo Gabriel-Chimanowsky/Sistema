@@ -118,18 +118,34 @@ try {
             PRIMARY KEY (`id`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
+        // Garantir novas colunas da tabela apps
+        $stmtAppsCols = $pdo->query("SHOW COLUMNS FROM apps");
+        $colunasApps = array_column($stmtAppsCols->fetchAll(), 'Field');
+        if (!in_array('permissions', $colunasApps)) {
+            $pdo->query("ALTER TABLE apps ADD COLUMN permissions TEXT NULL");
+        }
+        if (!in_array('permissions_status', $colunasApps)) {
+            $pdo->query("ALTER TABLE apps ADD COLUMN permissions_status TEXT NULL");
+        }
+        if (!in_array('user_access_token', $colunasApps)) {
+            $pdo->query("ALTER TABLE apps ADD COLUMN user_access_token TEXT NULL");
+        }
+
     } catch (Exception $e) {
         // Silenciar erro em produção ou logar
     }
 
 } catch (PDOException $e) {
-    if (strpos($_SERVER['REQUEST_URI'], '.php') !== false && strpos($_SERVER['REQUEST_URI'], 'api') === false) {
+    $isWeb = isset($_SERVER['REQUEST_URI']);
+    if ($isWeb && strpos($_SERVER['REQUEST_URI'], '.php') !== false && strpos($_SERVER['REQUEST_URI'], 'api') === false) {
         die("Erro crítico: Não foi possível conectar ao banco de dados.");
     } else {
-        header('Content-Type: application/json');
+        if (!headers_sent() && php_sapi_name() !== 'cli') {
+            header('Content-Type: application/json');
+        }
         die(json_encode([
             "sucesso" => false, 
-            "mensagem" => "Erro crítico: Não foi possível conectar ao banco de dados."
+            "mensagem" => "Erro crítico: Não foi possível conectar ao banco de dados. " . $e->getMessage()
         ]));
     }
 }
@@ -521,6 +537,247 @@ if (!function_exists('sincronizarSlackTracker')) {
             }
         } catch (Exception $e) {
             // Silenciar/logar erro
+        }
+    }
+}
+
+/**
+ * Envia uma notificação de texto simples ou formatada ao canal do Slack configurado.
+ */
+if (!function_exists('enviarNotificacaoSlack')) {
+    function enviarNotificacaoSlack($pdo, $mensagem) {
+        try {
+            $stmtConf = $pdo->query("SELECT slack_token, slack_canal_notificacao FROM configuracoes LIMIT 1");
+            $config = $stmtConf->fetch();
+            if (!$config || empty($config['slack_token']) || empty($config['slack_canal_notificacao'])) {
+                return false;
+            }
+
+            $token = $config['slack_token'];
+            $canal = $config['slack_canal_notificacao'];
+
+            $ch = curl_init("https://slack.com/api/chat.postMessage");
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                "Authorization: Bearer " . $token,
+                "Content-Type: application/json; charset=utf-8"
+            ]);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
+                "channel" => $canal,
+                "text" => $mensagem
+            ]));
+            $resRaw = curl_exec($ch);
+            curl_close($ch);
+
+            $resJson = json_decode($resRaw, true);
+            return ($resJson && isset($resJson['ok']) && $resJson['ok']);
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+}
+
+/**
+ * Verifica o status de um app da Meta (Facebook Graph API)
+ * Retorna um array ['status_conexao' => 'online'|'caiu', 'status' => 'analise'|'aprovado'|'rejeitado', 'permissions_status' => array, 'observacao_adicional' => string|null]
+ */
+if (!function_exists('verificarAppStatusMeta')) {
+    function verificarAppStatusMeta($app_id, $app_secret = null, $user_access_token = null, $tracked_permissions = '') {
+        $app_id = trim($app_id);
+        if (empty($app_id)) {
+            return [
+                'status_conexao' => 'caiu', 
+                'status' => 'rejeitado', 
+                'permissions_status' => [],
+                'observacao_adicional' => null
+            ];
+        }
+
+        $token = null;
+        if (!empty($user_access_token)) {
+            $token = trim($user_access_token);
+        } elseif (!empty($app_secret)) {
+            $token = $app_id . '|' . trim($app_secret);
+        }
+
+        $observacao_adicional = null;
+        $permissions_status = [];
+
+        // Parse tracked permissions
+        $tracked_arr = [];
+        if (!empty($tracked_permissions)) {
+            $tracked_arr = array_filter(array_map('trim', explode(',', $tracked_permissions)));
+        }
+
+        if (!empty($token)) {
+            // 1. Chamada autenticada com Token para buscar detalhes básicos
+            $ch = curl_init();
+            $url = "https://graph.facebook.com/v19.0/" . urlencode($app_id) . "?fields=id,name,development_mode&access_token=" . urlencode($token);
+            curl_setopt($ch, CURLOPT_URL, $url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+            $res = curl_exec($ch);
+            curl_close($ch);
+
+            $dados = json_decode($res, true);
+            if ($dados && isset($dados['id'])) {
+                $devMode = !empty($dados['development_mode']);
+                $status = $devMode ? 'analise' : 'aprovado';
+
+                // 2. Buscar status detalhado das permissões do aplicativo
+                $chPerm = curl_init();
+                $urlPerm = "https://graph.facebook.com/v19.0/" . urlencode($app_id) . "/permissions?access_token=" . urlencode($token);
+                curl_setopt($chPerm, CURLOPT_URL, $urlPerm);
+                curl_setopt($chPerm, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($chPerm, CURLOPT_SSL_VERIFYPEER, false);
+                curl_setopt($chPerm, CURLOPT_TIMEOUT, 10);
+                $resPerm = curl_exec($chPerm);
+                curl_close($chPerm);
+
+                $permDados = json_decode($resPerm, true);
+                $approved_list = [];
+                if ($permDados && isset($permDados['data'])) {
+                    foreach ($permDados['data'] as $item) {
+                        if (isset($item['permission']) && isset($item['status'])) {
+                            $approved_list[$item['permission']] = strtolower($item['status']);
+                        }
+                    }
+                }
+
+                // Mapear cada permissão monitorada
+                $all_live = true;
+                foreach ($tracked_arr as $p) {
+                    $p_status = $approved_list[$p] ?? 'unapproved';
+                    $permissions_status[$p] = $p_status;
+                    if ($p_status !== 'live') {
+                        $all_live = false;
+                    }
+                }
+
+                // 3. Se todas as permissões monitoradas forem aprovadas (live) e o app estiver em modo Dev,
+                // tentar mudar automaticamente para Live Mode (development_mode = false)
+                if ($devMode && count($tracked_arr) > 0 && $all_live) {
+                    $chPost = curl_init();
+                    curl_setopt($chPost, CURLOPT_URL, "https://graph.facebook.com/v19.0/" . urlencode($app_id));
+                    curl_setopt($chPost, CURLOPT_POST, true);
+                    curl_setopt($chPost, CURLOPT_RETURNTRANSFER, true);
+                    curl_setopt($chPost, CURLOPT_SSL_VERIFYPEER, false);
+                    curl_setopt($chPost, CURLOPT_POSTFIELDS, http_build_query([
+                        'development_mode' => 'false',
+                        'access_token' => $token
+                    ]));
+                    $postRes = curl_exec($chPost);
+                    curl_close($chPost);
+
+                    $postDados = json_decode($postRes, true);
+                    if ($postDados && !empty($postDados['success'])) {
+                        $status = 'aprovado';
+                        $observacao_adicional = "[Automático] Aplicativo ativado para Live Mode com sucesso, pois todas as permissões monitoradas foram aprovadas.";
+                    } else {
+                        $msgErro = $postDados['error']['message'] ?? 'Erro desconhecido ao mudar modo do aplicativo.';
+                        $observacao_adicional = "[Automático] Tentativa de ativar Live Mode falhou: " . $msgErro;
+                    }
+                }
+
+                return [
+                    'status_conexao' => 'online',
+                    'status' => $status,
+                    'permissions_status' => $permissions_status,
+                    'observacao_adicional' => $observacao_adicional
+                ];
+            }
+
+            return [
+                'status_conexao' => 'caiu', 
+                'status' => 'rejeitado', 
+                'permissions_status' => [], 
+                'observacao_adicional' => null
+            ];
+        } else {
+            // Chamada pública para a Graph API (Sem token)
+            $ch = curl_init();
+            $url = "https://graph.facebook.com/v19.0/" . urlencode($app_id);
+            curl_setopt($ch, CURLOPT_URL, $url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+            $res = curl_exec($ch);
+            curl_close($ch);
+
+            $dados = json_decode($res, true);
+            
+            // Mapear todas as monitoradas como unapproved por falta de token
+            foreach ($tracked_arr as $p) {
+                $permissions_status[$p] = 'unapproved';
+            }
+
+            if ($dados && isset($dados['error'])) {
+                $errorCode = $dados['error']['code'] ?? 0;
+                if ($errorCode == 104 || $errorCode == 190) {
+                    // Raspagem secundária do diálogo OAuth do Facebook para ver se está em modo dev
+                    $oauthUrl = "https://www.facebook.com/v19.0/dialog/oauth?client_id=" . urlencode($app_id) . "&redirect_uri=https://www.facebook.com/connect/login_success.html";
+                    
+                    $ch2 = curl_init();
+                    curl_setopt($ch2, CURLOPT_URL, $oauthUrl);
+                    curl_setopt($ch2, CURLOPT_RETURNTRANSFER, true);
+                    curl_setopt($ch2, CURLOPT_SSL_VERIFYPEER, false);
+                    curl_setopt($ch2, CURLOPT_FOLLOWLOCATION, true);
+                    curl_setopt($ch2, CURLOPT_TIMEOUT, 10);
+                    curl_setopt($ch2, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+                    $html = curl_exec($ch2);
+                    curl_close($ch2);
+
+                    if ($html !== false) {
+                        $htmlLower = strtolower($html);
+                        if (strpos($htmlLower, 'modo de desenvolvimento') !== false || 
+                            strpos($htmlLower, 'development mode') !== false ||
+                            strpos($htmlLower, 'app not active') !== false ||
+                            strpos($htmlLower, 'aplicativo n&atilde;o ativo') !== false ||
+                            strpos($htmlLower, 'aplicativo não ativo') !== false) {
+                            
+                            return [
+                                'status_conexao' => 'online', 
+                                'status' => 'analise',
+                                'permissions_status' => $permissions_status,
+                                'observacao_adicional' => null
+                            ];
+                        }
+                    }
+                    return [
+                        'status_conexao' => 'online', 
+                        'status' => 'aprovado',
+                        'permissions_status' => $permissions_status,
+                        'observacao_adicional' => null
+                    ];
+                }
+                return [
+                    'status_conexao' => 'caiu', 
+                    'status' => 'rejeitado',
+                    'permissions_status' => $permissions_status,
+                    'observacao_adicional' => null
+                ];
+            }
+            
+            if ($dados && isset($dados['id'])) {
+                $devMode = !empty($dados['development_mode']);
+                return [
+                    'status_conexao' => 'online',
+                    'status' => $devMode ? 'analise' : 'aprovado',
+                    'permissions_status' => $permissions_status,
+                    'observacao_adicional' => null
+                ];
+            }
+
+            return [
+                'status_conexao' => 'caiu', 
+                'status' => 'rejeitado',
+                'permissions_status' => $permissions_status,
+                'observacao_adicional' => null
+            ];
         }
     }
 }

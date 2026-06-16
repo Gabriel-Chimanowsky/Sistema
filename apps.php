@@ -331,6 +331,24 @@ function linkSortApp($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
                                             <option value="rejeitado" <?= $app['status'] === 'rejeitado' ? 'selected' : '' ?>>Rejeitado</option>
                                         </select>
                                     </form>
+                                    <div class="permissions-badges-container mt-2 flex flex-wrap gap-1 justify-center max-w-[180px] mx-auto">
+                                        <?php
+                                        if (!empty($app['permissions'])):
+                                            $tracked = array_filter(array_map('trim', explode(',', $app['permissions'])));
+                                            $status_data = json_decode($app['permissions_status'] ?? '{}', true) ?: [];
+                                            foreach ($tracked as $p):
+                                                if (empty($p)) continue;
+                                                $p_status = $status_data[$p] ?? 'unapproved';
+                                                $isLive = ($p_status === 'live' || $p_status === 'aprovado');
+                                        ?>
+                                                <span class="text-[9px] font-bold px-1.5 py-0.5 rounded border <?= $isLive ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-400 border-emerald-250' : 'bg-amber-100 text-amber-800 dark:bg-amber-950/30 dark:text-amber-400 border-amber-250' ?>">
+                                                    <?= htmlspecialchars($p) ?>: <?= $isLive ? 'live' : 'pendente' ?>
+                                                </span>
+                                        <?php 
+                                            endforeach;
+                                        endif; 
+                                        ?>
+                                    </div>
                                 </td>
                                 <td class="p-4 text-center connection-status-container">
                                     <div class="inline-flex items-center gap-1.5 font-bold uppercase text-[10px] px-2.5 py-1 rounded-full border 
@@ -461,6 +479,19 @@ function linkSortApp($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
                 </div>
 
                 <div class="space-y-1">
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider">Permissões para Monitorar (separadas por vírgula)</label>
+                    <input type="text" name="permissions" id="formAppPermissions" placeholder="Ex: email, public_profile, user_friends" 
+                        class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-3.5 rounded-2xl outline-none focus:border-blue-500 font-bold transition">
+                    <span class="text-[10px] text-slate-400 font-medium block">Dica: Deixe vazio para não monitorar permissões específicas.</span>
+                </div>
+
+                <div class="space-y-1">
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider">Token de Usuário (User Access Token) - Opcional</label>
+                    <input type="text" name="user_access_token" id="formAppUserAccessToken" placeholder="Cole o token de usuário se não tiver a App Secret" 
+                        class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-3.5 rounded-2xl outline-none focus:border-blue-500 font-bold font-mono transition">
+                </div>
+
+                <div class="space-y-1">
                     <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider">Observações / Anotações</label>
                     <textarea name="observacao" id="formAppObs" placeholder="Ex: Utilizado na campanha X, vinculado à conta Y..." rows="2" 
                         class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-3.5 rounded-2xl outline-none focus:border-blue-500 font-medium transition"></textarea>
@@ -581,6 +612,8 @@ function linkSortApp($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
             document.getElementById('formAppId').value = "";
             document.getElementById('formAppSecret').value = "";
             document.getElementById('formAppObs').value = "";
+            document.getElementById('formAppPermissions').value = "";
+            document.getElementById('formAppUserAccessToken').value = "";
             
             const m = document.getElementById('modalApp');
             m.classList.remove('hidden'); m.classList.add('flex');
@@ -597,6 +630,8 @@ function linkSortApp($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
             document.getElementById('formAppId').value = app.app_id;
             document.getElementById('formAppSecret').value = app.app_secret || '';
             document.getElementById('formAppObs').value = app.observacao || '';
+            document.getElementById('formAppPermissions').value = app.permissions || '';
+            document.getElementById('formAppUserAccessToken').value = app.user_access_token || '';
             
             const m = document.getElementById('modalApp');
             m.classList.remove('hidden'); m.classList.add('flex');
@@ -626,6 +661,37 @@ function linkSortApp($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
                 btn.innerHTML = '<i data-lucide="eye-off" class="w-3.5 h-3.5"></i>';
             }
             lucide.createIcons();
+        }
+
+        // Reconstruir badges de permissão dinamicamente via JS
+        function rebuildPermissionsBadges(row, permissionsStr, permissionsStatusJsonStr) {
+            const container = row.querySelector('.permissions-badges-container');
+            if (!container) return;
+            container.innerHTML = '';
+            
+            if (!permissionsStr) return;
+            
+            const tracked = permissionsStr.split(',').map(s => s.trim()).filter(s => s.length > 0);
+            if (tracked.length === 0) return;
+            
+            let statusData = {};
+            try {
+                statusData = typeof permissionsStatusJsonStr === 'object' ? permissionsStatusJsonStr : JSON.parse(permissionsStatusJsonStr || '{}');
+            } catch(e) {}
+            
+            tracked.forEach(p => {
+                const pStatus = statusData[p] || 'unapproved';
+                const isLive = pStatus === 'live' || pStatus === 'aprovado';
+                
+                const badge = document.createElement('span');
+                badge.className = `text-[9px] font-bold px-1.5 py-0.5 rounded border ${
+                    isLive 
+                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-400 border-emerald-250' 
+                    : 'bg-amber-100 text-amber-800 dark:bg-amber-950/30 dark:text-amber-400 border-amber-250'
+                }`;
+                badge.innerText = `${p}: ${isLive ? 'live' : 'pendente'}`;
+                container.appendChild(badge);
+            });
         }
 
         // Atualizar estilos e valor do select de status de aprovação de forma dinâmica
@@ -696,6 +762,9 @@ function linkSortApp($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
                     
                     // Atualiza dinamicamente o status no Meta
                     atualizarSelectStatusRow(row, res.status);
+
+                    // Reconstruir badges de permissão
+                    rebuildPermissionsBadges(row, res.permissions, res.permissions_status);
                     
                     // Atualiza data de validação
                     if (textVerifiedDate) {
@@ -776,6 +845,9 @@ function linkSortApp($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
                             }
                             
                             atualizarSelectStatusRow(row, res.status);
+
+                            // Reconstruir badges de permissão
+                            rebuildPermissionsBadges(row, res.permissions, res.permissions_status);
                             
                             if (textVerifiedDate) {
                                 textVerifiedDate.innerText = res.data_verificacao;
@@ -801,6 +873,29 @@ function linkSortApp($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
                 window.location.reload();
             }, 1500);
         }
+
+        // Disparo automático do script de verificação de segundo plano (cron)
+        window.addEventListener('DOMContentLoaded', () => {
+            setTimeout(() => {
+                fetch('cron_verificar_apps.php')
+                .then(res => res.json())
+                .then(data => {
+                    console.log("Background check executed:", data);
+                    // Se o cron verificou e atualizou registros, recarrega após um delay curto se o usuário não estiver editando
+                    if (data.sucesso && data.verificados > 0) {
+                        const isModalAppOpen = !document.getElementById('modalApp').classList.contains('hidden');
+                        const isModalImportOpen = !document.getElementById('modalImportar').classList.contains('hidden');
+                        if (!isModalAppOpen && !isModalImportOpen) {
+                            mostrarToast("O monitoramento em segundo plano detectou atualizações. Atualizando a página...");
+                            setTimeout(() => window.location.reload(), 1500);
+                        }
+                    }
+                })
+                .catch(err => {
+                    console.error("Background check failed:", err);
+                });
+            }, 3000); // 3 segundos após carregar
+        });
     </script>
 </body>
 </html>

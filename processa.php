@@ -77,92 +77,6 @@ function gerarNomesAleatoriosMassa($genero, $pais, $quantidade) {
     return $usuarios;
 }
 
-/**
- * Verifica o status de um app da Meta (Facebook Graph API)
- * Retorna um array ['status_conexao' => 'online'|'caiu', 'status' => 'analise'|'aprovado'|'rejeitado']
- */
-function verificarAppStatusMeta($app_id, $app_secret = null) {
-    $app_id = trim($app_id);
-    if (empty($app_id)) {
-        return ['status_conexao' => 'caiu', 'status' => 'rejeitado'];
-    }
-
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-    curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-
-    if (!empty($app_secret)) {
-        // Chamada autenticada com App Access Token (APP_ID|APP_SECRET)
-        $token = urlencode($app_id . '|' . trim($app_secret));
-        $url = "https://graph.facebook.com/v19.0/" . urlencode($app_id) . "?fields=id,name,development_mode&access_token=" . $token;
-        curl_setopt($ch, CURLOPT_URL, $url);
-        $res = curl_exec($ch);
-        curl_close($ch);
-
-        $dados = json_decode($res, true);
-        if ($dados && isset($dados['id'])) {
-            $devMode = !empty($dados['development_mode']);
-            return [
-                'status_conexao' => 'online',
-                'status' => $devMode ? 'analise' : 'aprovado'
-            ];
-        }
-        return ['status_conexao' => 'caiu', 'status' => 'rejeitado'];
-    } else {
-        // Chamada pública para a Graph API
-        $url = "https://graph.facebook.com/v19.0/" . urlencode($app_id);
-        curl_setopt($ch, CURLOPT_URL, $url);
-        $res = curl_exec($ch);
-        curl_close($ch);
-
-        $dados = json_decode($res, true);
-        if ($dados && isset($dados['error'])) {
-            $errorCode = $dados['error']['code'] ?? 0;
-            // 104 = Access token required (indica que o app existe e está ativo)
-            // 190 = Invalid access token
-            if ($errorCode == 104 || $errorCode == 190) {
-                // Raspagem secundária do diálogo OAuth do Facebook para ver se está em modo dev
-                $oauthUrl = "https://www.facebook.com/v19.0/dialog/oauth?client_id=" . urlencode($app_id) . "&redirect_uri=https://www.facebook.com/connect/login_success.html";
-                
-                $ch2 = curl_init();
-                curl_setopt($ch2, CURLOPT_URL, $oauthUrl);
-                curl_setopt($ch2, CURLOPT_RETURNTRANSFER, true);
-                curl_setopt($ch2, CURLOPT_SSL_VERIFYPEER, false);
-                curl_setopt($ch2, CURLOPT_FOLLOWLOCATION, true);
-                curl_setopt($ch2, CURLOPT_TIMEOUT, 10);
-                curl_setopt($ch2, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-                $html = curl_exec($ch2);
-                curl_close($ch2);
-
-                if ($html !== false) {
-                    $htmlLower = strtolower($html);
-                    if (strpos($htmlLower, 'modo de desenvolvimento') !== false || 
-                        strpos($htmlLower, 'development mode') !== false ||
-                        strpos($htmlLower, 'app not active') !== false ||
-                        strpos($htmlLower, 'aplicativo n&atilde;o ativo') !== false ||
-                        strpos($htmlLower, 'aplicativo não ativo') !== false) {
-                        
-                        return ['status_conexao' => 'online', 'status' => 'analise'];
-                    }
-                }
-                return ['status_conexao' => 'online', 'status' => 'aprovado'];
-            }
-            return ['status_conexao' => 'caiu', 'status' => 'rejeitado'];
-        }
-        
-        if ($dados && isset($dados['id'])) {
-            $devMode = !empty($dados['development_mode']);
-            return [
-                'status_conexao' => 'online',
-                'status' => $devMode ? 'analise' : 'aprovado'
-            ];
-        }
-
-        return ['status_conexao' => 'caiu', 'status' => 'rejeitado'];
-    }
-}
 
 // Lógica de ações
 switch ($acao) {
@@ -667,6 +581,8 @@ switch ($acao) {
         $app_id = trim($_POST['app_id'] ?? '');
         $app_secret = trim($_POST['app_secret'] ?? '') ?: null;
         $observacao = trim($_POST['observacao'] ?? '') ?: null;
+        $permissions = trim($_POST['permissions'] ?? '') ?: null;
+        $user_access_token = trim($_POST['user_access_token'] ?? '') ?: null;
 
         if (empty($nome) || empty($app_id)) {
             header("Location: apps.php?msg=erro_campos");
@@ -682,12 +598,17 @@ switch ($acao) {
         }
 
         // Validação automatizada
-        $resultado = verificarAppStatusMeta($app_id, $app_secret);
+        $resultado = verificarAppStatusMeta($app_id, $app_secret, $user_access_token, $permissions);
         $status_conexao = $resultado['status_conexao'];
         $status = $resultado['status'];
+        $permissions_status = json_encode($resultado['permissions_status']);
+        $obs = $observacao;
+        if ($resultado['observacao_adicional']) {
+            $obs = trim(($observacao ? $observacao . "\n" : "") . $resultado['observacao_adicional']);
+        }
 
-        $stmt = $pdo->prepare("INSERT INTO apps (nome, app_id, app_secret, status, status_conexao, observacao, data_verificacao) VALUES (?, ?, ?, ?, ?, ?, NOW())");
-        $stmt->execute([$nome, $app_id, $app_secret, $status, $status_conexao, $observacao]);
+        $stmt = $pdo->prepare("INSERT INTO apps (nome, app_id, app_secret, status, status_conexao, permissions, permissions_status, user_access_token, observacao, data_verificacao) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
+        $stmt->execute([$nome, $app_id, $app_secret, $status, $status_conexao, $permissions, $permissions_status, $user_access_token, $obs]);
         break;
 
     case 'edit_app':
@@ -696,6 +617,8 @@ switch ($acao) {
         $app_id = trim($_POST['app_id'] ?? '');
         $app_secret = trim($_POST['app_secret'] ?? '') ?: null;
         $observacao = trim($_POST['observacao'] ?? '') ?: null;
+        $permissions = trim($_POST['permissions'] ?? '') ?: null;
+        $user_access_token = trim($_POST['user_access_token'] ?? '') ?: null;
 
         if ($id && !empty($nome) && !empty($app_id)) {
             // Verificar duplicidade de app_id excluindo o próprio ID
@@ -707,12 +630,17 @@ switch ($acao) {
             }
 
             // Validação automatizada
-            $resultado = verificarAppStatusMeta($app_id, $app_secret);
+            $resultado = verificarAppStatusMeta($app_id, $app_secret, $user_access_token, $permissions);
             $status_conexao = $resultado['status_conexao'];
             $status = $resultado['status'];
+            $permissions_status = json_encode($resultado['permissions_status']);
+            $obs = $observacao;
+            if ($resultado['observacao_adicional']) {
+                $obs = trim(($observacao ? $observacao . "\n" : "") . $resultado['observacao_adicional']);
+            }
 
-            $stmt = $pdo->prepare("UPDATE apps SET nome = ?, app_id = ?, app_secret = ?, status = ?, status_conexao = ?, observacao = ?, data_verificacao = NOW() WHERE id = ?");
-            $stmt->execute([$nome, $app_id, $app_secret, $status, $status_conexao, $observacao, $id]);
+            $stmt = $pdo->prepare("UPDATE apps SET nome = ?, app_id = ?, app_secret = ?, status = ?, status_conexao = ?, permissions = ?, permissions_status = ?, user_access_token = ?, observacao = ?, data_verificacao = NOW() WHERE id = ?");
+            $stmt->execute([$nome, $app_id, $app_secret, $status, $status_conexao, $permissions, $permissions_status, $user_access_token, $obs, $id]);
         }
         break;
 
@@ -726,16 +654,21 @@ switch ($acao) {
     case 'verificar_app_status':
         $id = filter_input(INPUT_POST, 'app_id', FILTER_VALIDATE_INT);
         if ($id) {
-            $stmt = $pdo->prepare("SELECT app_id, app_secret FROM apps WHERE id = ?");
+            $stmt = $pdo->prepare("SELECT app_id, app_secret, user_access_token, permissions, observacao FROM apps WHERE id = ?");
             $stmt->execute([$id]);
             $app = $stmt->fetch();
             if ($app) {
-                $resultado = verificarAppStatusMeta($app['app_id'], $app['app_secret']);
+                $resultado = verificarAppStatusMeta($app['app_id'], $app['app_secret'], $app['user_access_token'], $app['permissions']);
                 $status_conexao = $resultado['status_conexao'];
                 $status = $resultado['status'];
+                $permissions_status = json_encode($resultado['permissions_status']);
+                $obs = $app['observacao'];
+                if ($resultado['observacao_adicional']) {
+                    $obs = trim(($app['observacao'] ? $app['observacao'] . "\n" : "") . $resultado['observacao_adicional']);
+                }
                 
-                $stmtUp = $pdo->prepare("UPDATE apps SET status_conexao = ?, status = ?, data_verificacao = NOW() WHERE id = ?");
-                $stmtUp->execute([$status_conexao, $status, $id]);
+                $stmtUp = $pdo->prepare("UPDATE apps SET status_conexao = ?, status = ?, permissions_status = ?, observacao = ?, data_verificacao = NOW() WHERE id = ?");
+                $stmtUp->execute([$status_conexao, $status, $permissions_status, $obs, $id]);
 
                 // Se for requisição AJAX
                 if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
@@ -744,7 +677,9 @@ switch ($acao) {
                         'sucesso' => true,
                         'status_conexao' => $status_conexao,
                         'status' => $status,
-                        'data_verificacao' => date('d/m/Y H:i')
+                        'data_verificacao' => date('d/m/Y H:i'),
+                        'permissions' => $app['permissions'] ?? '',
+                        'permissions_status' => $permissions_status
                     ]);
                     exit;
                 }
@@ -801,14 +736,14 @@ switch ($acao) {
             $appExistente = $stmtCheck->fetch();
 
             if ($appExistente) {
-                // Atualiza status e nome
-                $stmtUp = $pdo->prepare("UPDATE apps SET nome = ?, status = ?, status_conexao = 'online', data_verificacao = NOW() WHERE id = ?");
-                $stmtUp->execute([$nome, $status, $appExistente['id']]);
+                // Atualiza status e nome, salvando o token para futuras verificações automáticas
+                $stmtUp = $pdo->prepare("UPDATE apps SET nome = ?, status = ?, status_conexao = 'online', user_access_token = ?, data_verificacao = NOW() WHERE id = ?");
+                $stmtUp->execute([$nome, $status, $token, $appExistente['id']]);
                 $contadorAtualizados++;
             } else {
-                // Insere novo
-                $stmtIn = $pdo->prepare("INSERT INTO apps (nome, app_id, status, status_conexao, data_verificacao) VALUES (?, ?, ?, 'online', NOW())");
-                $stmtIn->execute([$nome, $app_id, $status]);
+                // Insere novo salvando o token para futuras verificações automáticas
+                $stmtIn = $pdo->prepare("INSERT INTO apps (nome, app_id, status, status_conexao, user_access_token, data_verificacao) VALUES (?, ?, ?, 'online', ?, NOW())");
+                $stmtIn->execute([$nome, $app_id, $status, $token]);
                 $contadorNovos++;
             }
         }
