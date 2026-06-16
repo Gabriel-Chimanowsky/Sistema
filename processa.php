@@ -702,47 +702,80 @@ switch ($acao) {
             exit;
         }
 
-        // Buscar a lista de apps do usuário via Graph API (tentando assigned_applications primeiro)
-        $url = "https://graph.facebook.com/v19.0/me/assigned_applications?fields=id,name,development_mode&limit=100&access_token=" . urlencode($token);
-        
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-        $res = curl_exec($ch);
-        curl_close($ch);
+        $appsEncontrados = [];
 
-        $dados = json_decode($res, true);
-        
-        // Fallback para /me/applications caso ocorra erro no primeiro endpoint
-        if (!$dados || isset($dados['error'])) {
-            $urlFallback = "https://graph.facebook.com/v19.0/me/applications?fields=id,name,development_mode&limit=100&access_token=" . urlencode($token);
-            $ch2 = curl_init();
-            curl_setopt($ch2, CURLOPT_URL, $urlFallback);
-            curl_setopt($ch2, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch2, CURLOPT_SSL_VERIFYPEER, false);
-            curl_setopt($ch2, CURLOPT_TIMEOUT, 15);
-            $resFallback = curl_exec($ch2);
-            curl_close($ch2);
-            
-            $dadosFallback = json_decode($resFallback, true);
-            if ($dadosFallback && !isset($dadosFallback['error'])) {
-                $dados = $dadosFallback;
+        // Helper para fazer requisição GET na Graph API do Facebook de forma padronizada
+        $fbGet = function($endpoint, $token) {
+            $url = "https://graph.facebook.com/v19.0/" . ltrim($endpoint, '/') . (strpos($endpoint, '?') !== false ? '&' : '?') . "access_token=" . urlencode($token);
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+            $res = curl_exec($ch);
+            curl_close($ch);
+            return json_decode($res, true);
+        };
+
+        // 1. Buscar de /me/assigned_applications (apps do desenvolvedor)
+        $resAssigned = $fbGet("me/assigned_applications?fields=id,name,development_mode&limit=100", $token);
+        if ($resAssigned && isset($resAssigned['data'])) {
+            foreach ($resAssigned['data'] as $app) {
+                if (isset($app['id'])) {
+                    $appsEncontrados[$app['id']] = $app;
+                }
             }
         }
 
-        if (!$dados || isset($dados['error'])) {
-            $msgErro = $dados['error']['message'] ?? 'Erro desconhecido na API do Facebook.';
-            $errorCode = $dados['error']['code'] ?? 0;
-            if ($errorCode == 100) {
-                $msgErro .= " (Dica: Certifique-se de que o token possui a permissão 'manage_app_solution' ou adicione os aplicativos manualmente usando o botão 'Adicionar Aplicativo'.)";
+        // 2. Buscar Contas de Negócios (Business Manager) e depois seus respectivos apps vinculados
+        $resBiz = $fbGet("me/businesses?limit=100", $token);
+        if ($resBiz && isset($resBiz['data'])) {
+            foreach ($resBiz['data'] as $biz) {
+                $bizId = $biz['id'] ?? null;
+                if (!$bizId) continue;
+
+                // Apps de propriedade do Business
+                $resOwned = $fbGet("{$bizId}/owned_apps?fields=id,name,development_mode&limit=100", $token);
+                if ($resOwned && isset($resOwned['data'])) {
+                    foreach ($resOwned['data'] as $app) {
+                        if (isset($app['id'])) {
+                            $appsEncontrados[$app['id']] = $app;
+                        }
+                    }
+                }
+
+                // Apps de clientes compartilhados com o Business
+                $resClient = $fbGet("{$bizId}/client_apps?fields=id,name,development_mode&limit=100", $token);
+                if ($resClient && isset($resClient['data'])) {
+                    foreach ($resClient['data'] as $app) {
+                        if (isset($app['id'])) {
+                            $appsEncontrados[$app['id']] = $app;
+                        }
+                    }
+                }
             }
+        }
+
+        // 3. Fallback final para /me/applications (antigo) se não encontrou nada nas buscas anteriores
+        if (empty($appsEncontrados)) {
+            $resAppsLegacy = $fbGet("me/applications?fields=id,name,development_mode&limit=100", $token);
+            if ($resAppsLegacy && isset($resAppsLegacy['data'])) {
+                foreach ($resAppsLegacy['data'] as $app) {
+                    if (isset($app['id'])) {
+                        $appsEncontrados[$app['id']] = $app;
+                    }
+                }
+            }
+        }
+
+        // Se mesmo após todas as varreduras o array continuar vazio, exibe dica amigável
+        if (empty($appsEncontrados)) {
+            $msgErro = "Nenhum aplicativo pôde ser encontrado nas APIs de desenvolvedor. Verifique se o token de acesso possui as permissões necessárias (ex: 'business_management', 'manage_app_solution') ou cadastre seus aplicativos manualmente no botão 'Adicionar Aplicativo'.";
             header("Location: apps.php?msg=erro_api_facebook&detalhe=" . urlencode($msgErro));
             exit;
         }
 
-        $appsImportados = $dados['data'] ?? [];
+        $appsImportados = array_values($appsEncontrados);
         $contadorNovos = 0;
         $contadorAtualizados = 0;
 
