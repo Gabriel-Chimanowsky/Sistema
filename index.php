@@ -138,7 +138,7 @@ function linkSort($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Contas - Facebook Account Manager V4.3</title>
-    <script src="tailwind.js"></script>
+    <script src="tailwind.js?v=1"></script>
     <script>
         tailwind.config = {
             darkMode: 'media',
