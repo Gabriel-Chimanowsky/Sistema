@@ -5,17 +5,9 @@ require_once 'conexao.php';
 // Impedir timeout
 set_time_limit(300);
 
-// Verificar se o script está sendo forçado a rodar todos os registros
-$force = (php_sapi_name() === 'cli') 
-    ? (isset($argv[1]) && $argv[1] === 'force')
-    : (isset($_GET['force']) && $_GET['force'] === 'true');
-
-if ($force) {
-    $stmt = $pdo->query("SELECT * FROM apps");
-} else {
-    // Apenas seleciona apps que nunca foram verificados ou foram verificados há mais de 15 minutos
-    $stmt = $pdo->query("SELECT * FROM apps WHERE data_verificacao IS NULL OR data_verificacao < DATE_SUB(NOW(), INTERVAL 15 MINUTE)");
-}
+// Verificar se o script está sendo forçado a rodar todos os registros (sempre forçado agora)
+$force = true;
+$stmt = $pdo->query("SELECT * FROM apps");
 
 $apps = $stmt->fetchAll();
 $contador = 0;

@@ -649,6 +649,7 @@ if (!function_exists('verificarAppStatusMeta')) {
                     $devMode = !$isLive;
                 }
                 $status = $devMode ? 'analise' : 'aprovado';
+                $status_conexao = $devMode ? 'caiu' : 'online';
 
                 // 2. Buscar status detalhado das permissões do aplicativo
                 $chPerm = curl_init();
@@ -698,6 +699,7 @@ if (!function_exists('verificarAppStatusMeta')) {
                     $postDados = json_decode($postRes, true);
                     if ($postDados && !empty($postDados['success'])) {
                         $status = 'aprovado';
+                        $status_conexao = 'online';
                         $observacao_adicional = "[Automático] Aplicativo ativado para Live Mode com sucesso, pois todas as permissões monitoradas foram aprovadas.";
                     } else {
                         $msgErro = $postDados['error']['message'] ?? 'Erro desconhecido ao mudar modo do aplicativo.';
@@ -706,7 +708,7 @@ if (!function_exists('verificarAppStatusMeta')) {
                 }
 
                 return [
-                    'status_conexao' => 'online',
+                    'status_conexao' => $status_conexao,
                     'status' => $status,
                     'permissions_status' => $permissions_status,
                     'observacao_adicional' => $observacao_adicional
@@ -771,9 +773,10 @@ if (!function_exists('verificarAppStatusMeta')) {
                 ];
             }
             
-            // Caso contrário (redirecionou para a tela de login ou fluxo válido), o app existe e está em modo de desenvolvimento
+            // Caso contrário (redirecionou para a tela de login ou fluxo válido), o app existe e está em modo de desenvolvimento.
+            // Como não está público (Live), sua conexão para fins de negócio é considerada 'caiu' (offline).
             return [
-                'status_conexao' => 'online', 
+                'status_conexao' => 'caiu', 
                 'status' => 'analise',
                 'permissions_status' => $permissions_status,
                 'observacao_adicional' => null
