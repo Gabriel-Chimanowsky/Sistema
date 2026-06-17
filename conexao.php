@@ -629,49 +629,21 @@ if (!function_exists('verificarAppStatusMeta')) {
                     $devMode = !empty($dados['development_mode']);
                 } else {
                     // Se o campo development_mode não veio na resposta do token (por falta de permissões ou escopo do token),
-                    // fazemos uma verificação na API pública do Graph
+                    // fazemos uma verificação na API pública do Graph. Se o app estiver no modo Live, a chamada pública funcionará e retornará seu ID.
                     $chPub = curl_init();
                     $urlPub = "https://graph.facebook.com/v19.0/" . urlencode($app_id);
                     curl_setopt($chPub, CURLOPT_URL, $urlPub);
                     curl_setopt($chPub, CURLOPT_RETURNTRANSFER, true);
                     curl_setopt($chPub, CURLOPT_SSL_VERIFYPEER, false);
                     curl_setopt($chPub, CURLOPT_TIMEOUT, 10);
+                    curl_setopt($chPub, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
                     $resPub = curl_exec($chPub);
                     curl_close($chPub);
 
                     $dadosPub = json_decode($resPub, true);
                     $isLive = false;
-                    if ($dadosPub) {
-                        if (isset($dadosPub['id'])) {
-                            $isLive = true;
-                        } elseif (isset($dadosPub['error'])) {
-                            $errCodePub = $dadosPub['error']['code'] ?? 0;
-                            if ($errCodePub == 104 || $errCodePub == 190) {
-                                $isLive = true;
-                            }
-                        }
-                    }
-
-                    // Se a API pública indica que não é Live, fazemos checagem de redirect no diálogo OAuth
-                    if (!$isLive) {
-                        $oauthUrl = "https://www.facebook.com/v19.0/dialog/oauth?client_id=" . urlencode($app_id) . "&redirect_uri=https://www.facebook.com/connect/login_success.html";
-                        $ch2 = curl_init();
-                        curl_setopt($ch2, CURLOPT_URL, $oauthUrl);
-                        curl_setopt($ch2, CURLOPT_RETURNTRANSFER, true);
-                        curl_setopt($ch2, CURLOPT_SSL_VERIFYPEER, false);
-                        curl_setopt($ch2, CURLOPT_FOLLOWLOCATION, false); // Não seguir redirects!
-                        curl_setopt($ch2, CURLOPT_TIMEOUT, 10);
-                        curl_setopt($ch2, CURLOPT_HEADER, true);
-                        curl_setopt($ch2, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-                        $html = curl_exec($ch2);
-                        $httpCode2 = curl_getinfo($ch2, CURLINFO_HTTP_CODE);
-                        curl_close($ch2);
-
-                        if ($httpCode2 == 302) {
-                            $isLive = false; // Redirect 302 -> o app existe, mas como a API deu erro 100, é modo dev
-                        } else {
-                            // Se não redirecionou, mas a chamada com token funcionou, o app é válido e mantemos devMode = true (seguro)
-                        }
+                    if ($dadosPub && isset($dadosPub['id'])) {
+                        $isLive = true;
                     }
                     
                     $devMode = !$isLive;
@@ -762,56 +734,8 @@ if (!function_exists('verificarAppStatusMeta')) {
             $permissions_status[$p] = 'unapproved';
         }
 
-        if ($dados && isset($dados['error'])) {
-            $errorCode = $dados['error']['code'] ?? 0;
-            if ($errorCode == 100 || $errorCode == 104 || $errorCode == 190) {
-                // Se for erro de token (104 ou 190), o app é válido e está Live
-                if ($errorCode == 104 || $errorCode == 190) {
-                    return [
-                        'status_conexao' => 'online',
-                        'status' => 'aprovado',
-                        'permissions_status' => $permissions_status,
-                        'observacao_adicional' => null
-                    ];
-                }
-                
-                // Se for erro 100 (Unsupported get request), verificamos o redirect no diálogo OAuth
-                $oauthUrl = "https://www.facebook.com/v19.0/dialog/oauth?client_id=" . urlencode($app_id) . "&redirect_uri=https://www.facebook.com/connect/login_success.html";
-                
-                $ch2 = curl_init();
-                curl_setopt($ch2, CURLOPT_URL, $oauthUrl);
-                curl_setopt($ch2, CURLOPT_RETURNTRANSFER, true);
-                curl_setopt($ch2, CURLOPT_SSL_VERIFYPEER, false);
-                curl_setopt($ch2, CURLOPT_FOLLOWLOCATION, false); // Não seguir redirects!
-                curl_setopt($ch2, CURLOPT_TIMEOUT, 10);
-                curl_setopt($ch2, CURLOPT_HEADER, true);
-                curl_setopt($ch2, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-                $html = curl_exec($ch2);
-                $httpCode2 = curl_getinfo($ch2, CURLINFO_HTTP_CODE);
-                curl_close($ch2);
-
-                if ($httpCode2 == 302) {
-                    // Se retornou redirect 302, o app existe e é válido -> modo dev (analise)
-                    return [
-                        'status_conexao' => 'online', 
-                        'status' => 'analise',
-                        'permissions_status' => $permissions_status,
-                        'observacao_adicional' => null
-                    ];
-                }
-            }
-            
-            // Caso contrário (erro 100 sem redirect, ou qualquer outro erro), o app caiu ou foi rejeitado
-            return [
-                'status_conexao' => 'caiu', 
-                'status' => 'rejeitado',
-                'permissions_status' => $permissions_status,
-                'observacao_adicional' => null
-            ];
-        }
-        
+        // 1. Se a chamada pública sem token retornou o ID, o app está no modo Live (aprovado) e está Online
         if ($dados && isset($dados['id'])) {
-            // Se a chamada pública sem token retornou o ID, o app é Live (aprovado) e Online
             return [
                 'status_conexao' => 'online',
                 'status' => 'aprovado',
@@ -820,6 +744,43 @@ if (!function_exists('verificarAppStatusMeta')) {
             ];
         }
 
+        // 2. Se a chamada pública falhou, fazemos a checagem del redirecionamento do diálogo OAuth do Facebook
+        $oauthUrl = "https://www.facebook.com/v19.0/dialog/oauth?client_id=" . urlencode($app_id) . "&redirect_uri=https://www.facebook.com/connect/login_success.html";
+        
+        $ch2 = curl_init();
+        curl_setopt($ch2, CURLOPT_URL, $oauthUrl);
+        curl_setopt($ch2, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch2, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch2, CURLOPT_FOLLOWLOCATION, false); // Não seguir redirects!
+        curl_setopt($ch2, CURLOPT_TIMEOUT, 10);
+        curl_setopt($ch2, CURLOPT_HEADER, true);
+        curl_setopt($ch2, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+        $html = curl_exec($ch2);
+        $httpCode2 = curl_getinfo($ch2, CURLINFO_HTTP_CODE);
+        $redirectUrl = curl_getinfo($ch2, CURLINFO_REDIRECT_URL);
+        curl_close($ch2);
+
+        if ($httpCode2 == 302 && !empty($redirectUrl)) {
+            // Se redirecionar para um erro de ID inválido do SDK/Plataforma, o app caiu/não existe
+            if (stripos($redirectUrl, 'PLATFORM__INVALID_APP_ID') !== false || stripos($redirectUrl, '/oauth/error/') !== false) {
+                return [
+                    'status_conexao' => 'caiu', 
+                    'status' => 'rejeitado',
+                    'permissions_status' => $permissions_status,
+                    'observacao_adicional' => null
+                ];
+            }
+            
+            // Caso contrário (redirecionou para a tela de login ou fluxo válido), o app existe e está em modo de desenvolvimento
+            return [
+                'status_conexao' => 'online', 
+                'status' => 'analise',
+                'permissions_status' => $permissions_status,
+                'observacao_adicional' => null
+            ];
+        }
+
+        // Se não redirecionou ou houve falha crítica de rede, consideramos o app como caído
         return [
             'status_conexao' => 'caiu', 
             'status' => 'rejeitado',

@@ -259,7 +259,9 @@ function linkSortApp($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
                     Verificar Todos
                 </button>
                 <button type="button" onclick="abrirModalImportar()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-emerald-600/20 transition active:scale-95 text-xs">
-                    <i data-lucide="facebook" class="w-4 h-4"></i>
+                    <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                        <path d="M22 12c0-5.52-4.48-10-10-10S2 6.48 2 12c0 4.84 3.44 8.87 8 9.8V15H8v-3h2V9.5C10 7.57 11.57 6 13.5 6H16v3h-2c-.55 0-1 .45-1 1v2h3v3h-3v6.95c4.56-.93 8-4.96 8-9.75z"/>
+                    </svg>
                     Conectar Facebook
                 </button>
                 <button type="button" onclick="abrirModalAdd()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-blue-600/20 transition active:scale-95 text-xs">
@@ -510,7 +512,9 @@ function linkSortApp($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
         <div class="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 max-w-lg w-full shadow-2xl border border-slate-200 dark:border-slate-800 transform scale-90 transition-all duration-200" id="modalImportarContent">
             <div class="flex items-center justify-between mb-6">
                 <h3 class="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2">
-                    <i data-lucide="facebook" class="w-6 h-6 text-emerald-600"></i>
+                    <svg class="w-6 h-6 text-emerald-600 fill-current" viewBox="0 0 24 24">
+                        <path d="M22 12c0-5.52-4.48-10-10-10S2 6.48 2 12c0 4.84 3.44 8.87 8 9.8V15H8v-3h2V9.5C10 7.57 11.57 6 13.5 6H16v3h-2c-.55 0-1 .45-1 1v2h3v3h-3v6.95c4.56-.93 8-4.96 8-9.75z"/>
+                    </svg>
                     <span>Conectar Facebook</span>
                 </h3>
                 <button type="button" onclick="fecharModalImportar()" class="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition">
@@ -649,7 +653,7 @@ function linkSortApp($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
             const container = btn.closest('div');
             const masked = container.querySelector('.app-secret-masked');
             const raw = container.querySelector('.app-secret-raw');
-            const icon = btn.querySelector('i');
+            const icon = btn.querySelector('i') || btn.querySelector('svg');
             
             if (masked.classList.contains('hidden')) {
                 masked.classList.remove('hidden');
@@ -713,7 +717,7 @@ function linkSortApp($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
         // ── Verificação de Status com AJAX ──────────────────────────
         function verificarApp(id, btn) {
             const row = btn.closest('tr');
-            const icon = btn.querySelector('i');
+            const icon = btn.querySelector('i') || btn.querySelector('svg');
             
             // Estado de carregamento
             btn.classList.add('pointer-events-none');
@@ -803,7 +807,7 @@ function linkSortApp($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
                 row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 
                 await new Promise((resolve) => {
-                    const icon = btn.querySelector('i');
+                    const icon = btn.querySelector('i') || btn.querySelector('svg');
                     btn.classList.add('pointer-events-none');
                     icon.classList.add('animate-spin', 'text-blue-500');
                     
