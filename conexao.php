@@ -56,6 +56,12 @@ try {
         if (!in_array('data_pagina_criada', $colunasContas)) {
             $pdo->query("ALTER TABLE contas ADD COLUMN data_pagina_criada DATETIME NULL");
         }
+        if (!in_array('dev_criada', $colunasContas)) {
+            $pdo->query("ALTER TABLE contas ADD COLUMN dev_criada TINYINT(1) NOT NULL DEFAULT 0");
+        }
+        if (!in_array('data_dev_criada', $colunasContas)) {
+            $pdo->query("ALTER TABLE contas ADD COLUMN data_dev_criada DATETIME NULL");
+        }
         if (!in_array('slack_perfil_sync', $colunasContas)) {
             $pdo->query("ALTER TABLE contas ADD COLUMN slack_perfil_sync TINYINT(1) NOT NULL DEFAULT 0");
         }

@@ -470,6 +470,43 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
                                                 <?php endif; ?>
                                             <?php endif; ?>
                                         </div>
+
+                                        <!-- Meta for Developers -->
+                                        <div class="flex items-center gap-2">
+                                            <?php if (isset($conta['dev_criada']) && $conta['dev_criada'] == 1): 
+                                                $dias_dev = 0;
+                                                if (!empty($conta['data_dev_criada'])) {
+                                                    $dias_dev = floor((time() - strtotime($conta['data_dev_criada'])) / 86400);
+                                                }
+                                            ?>
+                                                <div class="inline-flex items-center gap-1 text-[9px] font-black uppercase text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 pl-2 pr-1 py-0.5 rounded-lg">
+                                                    <i data-lucide="code-2" class="w-3 h-3"></i>
+                                                    Dev Criado (<?= $dias_dev ?>d)
+                                                    <form method="POST" action="processa.php" class="inline" onsubmit="event.preventDefault(); var f = this; showConfirmCard('Desfazer Dev', 'Deseja desfazer a criação do Meta for Developers desta conta?', 'Desfazer Dev', 'bg-orange-600 hover:bg-orange-700 shadow-orange-600/30', () => f.submit());">
+                                                        <input type="hidden" name="acao" value="remover_dev">
+                                                        <input type="hidden" name="conta_id" value="<?= $conta['id'] ?>">
+                                                        <button type="submit" class="hover:bg-orange-200 dark:hover:bg-orange-800 p-0.5 rounded text-orange-500 hover:text-orange-700 dark:text-orange-400 dark:hover:text-orange-300 transition" title="Desfazer Dev">
+                                                            <i data-lucide="x" class="w-2.5 h-2.5"></i>
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            <?php else: ?>
+                                                <?php if ($dias_vida >= 7): ?>
+                                                    <form method="POST" action="processa.php" class="inline-block">
+                                                        <input type="hidden" name="acao" value="criar_dev">
+                                                        <input type="hidden" name="conta_id" value="<?= $conta['id'] ?>">
+                                                        <button type="submit" class="bg-orange-600 hover:bg-orange-700 text-white font-extrabold text-[9px] uppercase px-2 py-1 rounded-lg shadow-sm transition active:scale-95 flex items-center gap-1">
+                                                            <i data-lucide="plus-circle" class="w-2.5 h-2.5"></i>
+                                                            Criar Dev
+                                                        </button>
+                                                    </form>
+                                                <?php else: ?>
+                                                    <span class="inline-block text-[9px] font-bold text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800/40 px-1.5 py-0.5 rounded-lg" title="Aguardando maturação de 7 dias">
+                                                        Dev: Maturando (falta <?= 7 - $dias_vida ?>d)
+                                                    </span>
+                                                <?php endif; ?>
+                                            <?php endif; ?>
+                                        </div>
                                     </div>
                                 <?php endif; ?>
                             </td>

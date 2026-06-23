@@ -547,6 +547,20 @@ switch ($acao) {
         }
         break;
 
+    case 'criar_dev':
+        $id = filter_input(INPUT_POST, 'conta_id', FILTER_VALIDATE_INT);
+        if ($id) {
+            $pdo->prepare("UPDATE contas SET dev_criada = 1, data_dev_criada = NOW() WHERE id = ?")->execute([$id]);
+        }
+        break;
+
+    case 'remover_dev':
+        $id = filter_input(INPUT_POST, 'conta_id', FILTER_VALIDATE_INT);
+        if ($id) {
+            $pdo->prepare("UPDATE contas SET dev_criada = 0, data_dev_criada = NULL WHERE id = ?")->execute([$id]);
+        }
+        break;
+
     case 'regerar_todas_falhadas':
         $contasFalhadas = $pdo->query("SELECT id, genero, pais FROM contas WHERE nome = 'User'")->fetchAll();
         if (count($contasFalhadas) > 0) {
