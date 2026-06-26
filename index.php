@@ -523,7 +523,7 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
                                 </form>
                             </td>
                             <td class="p-4 text-right pr-6">
-                                <div class="relative flex items-center justify-end gap-2">
+                                <div class="flex items-center justify-end gap-2">
                                     <button onclick="copiarContaUnica(this)" class="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition" title="Copiar Perfil"><i data-lucide="clipboard-copy" class="w-4 h-4"></i></button>
                                     <div class="w-px h-4 bg-slate-200 dark:border-slate-700"></div>
                                     <button onclick="abrirNotaConta(<?= $conta['id'] ?>, <?= json_encode($conta['nota_conta'] ?? '') ?>)" class="p-2 rounded-lg transition <?= !empty($conta['nota_conta']) ? 'text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20' : 'text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800' ?>" title="<?= !empty($conta['nota_conta']) ? htmlspecialchars($conta['nota_conta']) : 'Adicionar comentário' ?>"><i data-lucide="message-square<?= !empty($conta['nota_conta']) ? '' : '-plus' ?>" class="w-4 h-4"></i></button>
@@ -532,7 +532,7 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
                                     <button onclick="abrirModal('Excluir conta permanentemente?', this.closest('tr').querySelector('.form-del'))" class="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                                     
                                     <!-- Popover nota -->
-                                    <div id="nota-popover-<?= $conta['id'] ?>" class="hidden absolute right-0 z-30 bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 mt-2 w-72">
+                                    <div id="nota-popover-<?= $conta['id'] ?>" class="hidden fixed z-[200] bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 w-72">
                                         <p class="text-xs font-black text-slate-500 uppercase tracking-wider mb-2">Comentário da Conta</p>
                                         <form method="POST" action="processa.php" class="space-y-2">
                                             <input type="hidden" name="acao" value="salvar_nota_conta">
@@ -1050,13 +1050,35 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
             const pop = document.getElementById('nota-popover-' + id);
             if (!pop) return;
             const isHidden = pop.classList.contains('hidden');
-            pop.classList.toggle('hidden');
-            notaAberta = isHidden ? id : null;
-            if (isHidden) {
-                // Foca o textarea ao abrir
-                const ta = pop.querySelector('textarea');
-                if (ta) setTimeout(() => ta.focus(), 50);
+            if (!isHidden) {
+                pop.classList.add('hidden');
+                notaAberta = null;
+                return;
             }
+            // Posicionar como fixed relativo ao botão clicado
+            const btn = document.querySelector(`[onclick*="abrirNotaConta(${id})"]`);
+            if (btn) {
+                const rect = btn.getBoundingClientRect();
+                const popW = 288; // w-72 = 18rem = 288px
+                const popH = 180; // altura estimada do popover
+                const spaceBelow = window.innerHeight - rect.bottom;
+                let top, left;
+                // Abrir para cima se não há espaço abaixo
+                if (spaceBelow < popH + 10) {
+                    top = rect.top - popH - 8;
+                } else {
+                    top = rect.bottom + 8;
+                }
+                // Alinhar à direita do botão sem sair da tela
+                left = Math.min(rect.right - popW, window.innerWidth - popW - 8);
+                left = Math.max(left, 8);
+                pop.style.top = top + 'px';
+                pop.style.left = left + 'px';
+            }
+            pop.classList.remove('hidden');
+            notaAberta = id;
+            const ta = pop.querySelector('textarea');
+            if (ta) setTimeout(() => ta.focus(), 50);
         }
         function fecharNotaConta(id) {
             const pop = document.getElementById('nota-popover-' + id);
