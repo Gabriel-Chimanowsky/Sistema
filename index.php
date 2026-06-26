@@ -531,19 +531,7 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
                                     <button onclick="abrirModal('Regerar dados desta conta?', this.closest('tr').querySelector('.form-regerar'))" class="p-2 text-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg transition"><i data-lucide="refresh-cw" class="w-4 h-4"></i></button>
                                     <button onclick="abrirModal('Excluir conta permanentemente?', this.closest('tr').querySelector('.form-del'))" class="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                                     
-                                    <!-- Popover nota -->
-                                    <div id="nota-popover-<?= $conta['id'] ?>" class="hidden fixed z-[200] bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 w-72">
-                                        <p class="text-xs font-black text-slate-500 uppercase tracking-wider mb-2">Comentário da Conta</p>
-                                        <form method="POST" action="processa.php" class="space-y-2">
-                                            <input type="hidden" name="acao" value="salvar_nota_conta">
-                                            <input type="hidden" name="conta_id" value="<?= $conta['id'] ?>">
-                                            <textarea name="nota_conta" rows="3" placeholder="Ex: bm tanana feita, sem cookie..." class="w-full text-xs p-2 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-900 outline-none focus:border-blue-500 resize-none transition"><?= htmlspecialchars($conta['nota_conta'] ?? '') ?></textarea>
-                                            <div class="flex gap-2">
-                                                <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-1.5 rounded-xl text-xs font-bold transition">Salvar</button>
-                                                <button type="button" onclick="fecharNotaConta(<?= $conta['id'] ?>)" class="px-3 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 rounded-xl text-xs font-bold transition">Cancelar</button>
-                                            </div>
-                                        </form>
-                                    </div>
+                                    <!-- Popover nota: renderizado globalmente, fora da tabela -->
 
                                     <form method="POST" action="processa.php" class="form-regerar hidden"><input type="hidden" name="acao" value="regerar_conta"><input type="hidden" name="conta_id" value="<?= $conta['id'] ?>"></form>
                                     <form method="POST" action="processa.php" class="form-del hidden"><input type="hidden" name="acao" value="del_conta"><input type="hidden" name="conta_id" value="<?= $conta['id'] ?>"></form>
@@ -741,6 +729,20 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
                 </div>
             </div>
         </div>
+    </div>
+
+    <!-- Popover Global de Nota (único, fora da tabela) -->
+    <div id="nota-popover-global" class="hidden fixed z-[9999] bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 w-72" style="pointer-events:auto">
+        <p class="text-xs font-black text-slate-500 uppercase tracking-wider mb-2">Comentário da Conta</p>
+        <form method="POST" action="processa.php" class="space-y-2">
+            <input type="hidden" name="acao" value="salvar_nota_conta">
+            <input type="hidden" name="conta_id" id="nota-global-conta-id">
+            <textarea name="nota_conta" id="nota-global-textarea" rows="3" placeholder="Ex: bm tanana feita, sem cookie..." class="w-full text-xs p-2 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-900 outline-none focus:border-blue-500 resize-none transition"></textarea>
+            <div class="flex gap-2">
+                <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-1.5 rounded-xl text-xs font-bold transition">Salvar</button>
+                <button type="button" onclick="fecharNotaConta()" class="px-3 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 rounded-xl text-xs font-bold transition">Cancelar</button>
+            </div>
+        </form>
     </div>
 
     <!-- UI Components -->
@@ -1040,72 +1042,77 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
         }
         function confirmarModal() { if(formAlvo) formAlvo.submit(); }
 
-        // ── Nota / Comentário por Conta ───────────────────────────────
+        // ── Nota / Comentário por Conta (popover global) ─────────────
         let notaAberta = null;
+        let notaBtnAberto = null;
+
         function abrirNotaConta(id) {
-            if (notaAberta && notaAberta !== id) {
-                const old = document.getElementById('nota-popover-' + notaAberta);
-                if (old) old.classList.add('hidden');
-            }
-            const pop = document.getElementById('nota-popover-' + id);
-            if (!pop) return;
-            const isHidden = pop.classList.contains('hidden');
-            if (!isHidden) {
-                pop.classList.add('hidden');
-                notaAberta = null;
+            const pop = document.getElementById('nota-popover-global');
+
+            // Toggle: fechar se já está aberto para o mesmo id
+            if (notaAberta === id && !pop.classList.contains('hidden')) {
+                fecharNotaConta();
                 return;
             }
-            // Tornar visível temporariamente com opacity 0 para medir altura real
-            pop.style.visibility = 'hidden';
-            pop.style.opacity = '0';
-            pop.classList.remove('hidden');
-            const popRect = pop.getBoundingClientRect();
-            const popW = popRect.width || 288;
-            const popH = popRect.height || 220;
-            pop.classList.add('hidden');
-            pop.style.visibility = '';
-            pop.style.opacity = '';
 
+            // Buscar nota atual no data-json da linha
+            const tr = document.querySelector(`tr[data-id="${id}"]`);
+            let notaValor = '';
+            if (tr && tr.dataset.json) {
+                try { notaValor = JSON.parse(tr.dataset.json).nota_conta || ''; } catch(e) {}
+            }
+
+            // Preencher o popover global
+            document.getElementById('nota-global-conta-id').value = id;
+            document.getElementById('nota-global-textarea').value = notaValor;
+            notaAberta = id;
+
+            // Encontrar o botão clicado
             const btn = document.querySelector(`[onclick*="abrirNotaConta(${id})"]`);
+            notaBtnAberto = btn;
+
+            // Posicionar corretamente
+            pop.style.visibility = 'hidden';
+            pop.classList.remove('hidden');
+            const popH = pop.offsetHeight;
+            const popW = pop.offsetWidth;
+
             if (btn) {
                 const rect = btn.getBoundingClientRect();
-                // Desconta a barra fixa do rodapé (~88px)
-                const footerH = 88;
+                const footerH = 90; // barra fixa do rodapé
                 const usableBottom = window.innerHeight - footerH;
                 const spaceBelow = usableBottom - rect.bottom;
-                let top, left;
-                // Preferir abrir para cima quando há pouco espaço abaixo
-                if (spaceBelow < popH + 10) {
-                    top = rect.top - popH - 8;
-                    // Garantir que não saia do topo da tela
-                    top = Math.max(top, 8);
-                } else {
-                    top = rect.bottom + 8;
-                }
-                // Alinhar à direita do botão sem sair da tela
-                left = Math.min(rect.right - popW, window.innerWidth - popW - 8);
+
+                let top = (spaceBelow < popH + 10)
+                    ? Math.max(8, rect.top - popH - 8)  // abre para cima
+                    : rect.bottom + 8;                   // abre para baixo
+
+                let left = rect.right - popW;
+                left = Math.min(left, window.innerWidth - popW - 8);
                 left = Math.max(left, 8);
-                pop.style.top = top + 'px';
+
+                pop.style.top  = top  + 'px';
                 pop.style.left = left + 'px';
             }
-            pop.classList.remove('hidden');
-            notaAberta = id;
-            const ta = pop.querySelector('textarea');
-            if (ta) setTimeout(() => ta.focus(), 50);
+
+            pop.style.visibility = '';
+            setTimeout(() => document.getElementById('nota-global-textarea').focus(), 50);
         }
-        function fecharNotaConta(id) {
-            const pop = document.getElementById('nota-popover-' + id);
-            if (pop) pop.classList.add('hidden');
-            if (notaAberta === id) notaAberta = null;
+
+        function fecharNotaConta() {
+            const pop = document.getElementById('nota-popover-global');
+            pop.classList.add('hidden');
+            notaAberta = null;
+            notaBtnAberto = null;
         }
-        // Fechar ao clicar fora
+
+        // Fechar ao clicar fora do popover e fora do botão
         document.addEventListener('click', function(e) {
             if (!notaAberta) return;
-            const pop = document.getElementById('nota-popover-' + notaAberta);
-            if (pop && !pop.classList.contains('hidden') && !pop.contains(e.target)) {
-                const btn = e.target.closest(`[onclick*="abrirNotaConta(${notaAberta})"]`);
-                if (!btn) fecharNotaConta(notaAberta);
-            }
+            const pop = document.getElementById('nota-popover-global');
+            if (pop.contains(e.target)) return;         // clique dentro do popover
+            if (notaBtnAberto && notaBtnAberto.contains(e.target)) return; // clique no botão
+            fecharNotaConta();
         }, true);
 
         function copiarContaUnica(btn) {
