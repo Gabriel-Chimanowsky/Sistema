@@ -8,6 +8,10 @@ if (isFinanceiro()) {
     exit;
 }
 
+// Garante que a coluna comentario existe
+try { $pdo->query("SELECT comentario FROM pessoas LIMIT 1"); } catch (Exception $e) {
+    $pdo->query("ALTER TABLE pessoas ADD COLUMN comentario TEXT DEFAULT NULL");
+}
 $stmtPessoas = $pdo->query("SELECT * FROM pessoas ORDER BY nome ASC");
 $pessoas = $stmtPessoas->fetchAll();
 ?>
@@ -56,22 +60,55 @@ $pessoas = $stmtPessoas->fetchAll();
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <?php foreach ($pessoas as $p): ?>
-                    <div class="group flex justify-between items-center bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all">
-                        <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 bg-white dark:bg-slate-800 rounded-xl flex items-center justify-center text-slate-400 group-hover:text-blue-500 transition-colors">
-                                <i data-lucide="user" class="w-5 h-5"></i>
+                    <div class="group bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all">
+                        <!-- Linha superior: ícone + nome + botão excluir -->
+                        <div class="flex justify-between items-center">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 bg-white dark:bg-slate-800 rounded-xl flex items-center justify-center text-slate-400 group-hover:text-blue-500 transition-colors">
+                                    <i data-lucide="user" class="w-5 h-5"></i>
+                                </div>
+                                <span class="font-bold text-slate-700 dark:text-slate-200"><?= htmlspecialchars($p['nome']) ?></span>
                             </div>
-                            <span class="font-bold text-slate-700 dark:text-slate-200"><?= htmlspecialchars($p['nome']) ?></span>
+                            <button type="button" onclick="abrirModal('Excluir <?= htmlspecialchars(addslashes($p['nome'])) ?>? As contas vinculadas a ele ficarão sem dono.', this.nextElementSibling)" 
+                                class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                            <form method="POST" action="processa.php" class="hidden">
+                                <input type="hidden" name="acao" value="del_pessoa">
+                                <input type="hidden" name="pessoa_id" value="<?= $p['id'] ?>">
+                            </form>
                         </div>
-                        
-                        <button type="button" onclick="abrirModal('Excluir <?= htmlspecialchars(addslashes($p['nome'])) ?>? As contas vinculadas a ele ficarão sem dono.', this.nextElementSibling)" 
-                            class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all">
-                            <i data-lucide="trash-2" class="w-4 h-4"></i>
-                        </button>
-                        <form method="POST" action="processa.php" class="hidden">
-                            <input type="hidden" name="acao" value="del_pessoa">
-                            <input type="hidden" name="pessoa_id" value="<?= $p['id'] ?>">
-                        </form>
+
+                        <!-- Comentário editável -->
+                        <div class="mt-2 pl-[52px]">
+                            <div id="comentario-display-<?= $p['id'] ?>" class="flex items-center gap-2">
+                                <?php if (!empty($p['comentario'])): ?>
+                                    <span class="text-sm text-slate-500 dark:text-slate-400 italic flex-1"><?= htmlspecialchars($p['comentario']) ?></span>
+                                <?php else: ?>
+                                    <span class="text-sm text-slate-400 dark:text-slate-500 italic flex-1">Sem comentário</span>
+                                <?php endif; ?>
+                                <button type="button" onclick="abrirComentario(<?= $p['id'] ?>, <?= json_encode($p['comentario'] ?? '') ?>)"
+                                    class="shrink-0 p-1 text-slate-300 hover:text-blue-500 rounded-lg transition-all" title="Editar comentário">
+                                    <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                                </button>
+                            </div>
+                            <div id="comentario-form-<?= $p['id'] ?>" class="hidden mt-2">
+                                <form method="POST" action="processa.php" class="flex gap-2">
+                                    <input type="hidden" name="acao" value="salvar_comentario_pessoa">
+                                    <input type="hidden" name="pessoa_id" value="<?= $p['id'] ?>">
+                                    <input type="text" name="comentario" id="comentario-input-<?= $p['id'] ?>"
+                                        placeholder="Ex: bm tanana feita..."
+                                        class="flex-1 text-sm bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 focus:border-blue-500 px-3 py-1.5 rounded-xl outline-none transition-all">
+                                    <button type="submit" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-xl font-semibold transition-all active:scale-95" title="Salvar">
+                                        <i data-lucide="check" class="w-3.5 h-3.5"></i>
+                                    </button>
+                                    <button type="button" onclick="fecharComentario(<?= $p['id'] ?>)"
+                                        class="px-3 py-1.5 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-sm rounded-xl font-semibold transition-all" title="Cancelar">
+                                        <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
                     </div>
                 <?php endforeach; ?>
                 
@@ -102,6 +139,20 @@ $pessoas = $stmtPessoas->fetchAll();
 
     <script>
         lucide.createIcons();
+
+        function abrirComentario(id, valorAtual) {
+            document.getElementById('comentario-display-' + id).classList.add('hidden');
+            const formDiv = document.getElementById('comentario-form-' + id);
+            formDiv.classList.remove('hidden');
+            const input = document.getElementById('comentario-input-' + id);
+            input.value = valorAtual || '';
+            input.focus();
+        }
+        function fecharComentario(id) {
+            document.getElementById('comentario-display-' + id).classList.remove('hidden');
+            document.getElementById('comentario-form-' + id).classList.add('hidden');
+        }
+
         let formAlvo = null;
         function abrirModal(txt, form) {
             document.getElementById('textoModal').innerText = txt;

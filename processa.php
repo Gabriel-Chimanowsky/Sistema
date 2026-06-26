@@ -467,6 +467,18 @@ switch ($acao) {
         if ($id) $pdo->prepare("DELETE FROM pessoas WHERE id = ?")->execute([$id]);
         break;
 
+    case 'salvar_comentario_pessoa':
+        // Migração automática: adiciona coluna se ainda não existir
+        try { $pdo->query("SELECT comentario FROM pessoas LIMIT 1"); } catch (Exception $e) {
+            $pdo->query("ALTER TABLE pessoas ADD COLUMN comentario TEXT DEFAULT NULL");
+        }
+        $id = filter_input(INPUT_POST, 'pessoa_id', FILTER_VALIDATE_INT);
+        $comentario = trim($_POST['comentario'] ?? '');
+        if ($id) {
+            $pdo->prepare("UPDATE pessoas SET comentario = ? WHERE id = ?")->execute([$comentario ?: null, $id]);
+        }
+        break;
+
     case 'atualizar_config':
         $sql = "UPDATE configuracoes SET senha_padrao = ?, email_contador = ?, genero_padrao = ?, pais_padrao = ?, email_prefixo = ?, email_dominio = ?, slack_token = ?, slack_canal_notificacao = ?, preco_perfil = ?, preco_bm = ?, preco_pagina = ?";
         $pdo->prepare($sql)->execute([
