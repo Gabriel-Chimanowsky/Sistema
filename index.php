@@ -1055,17 +1055,30 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
                 notaAberta = null;
                 return;
             }
-            // Posicionar como fixed relativo ao botão clicado
+            // Tornar visível temporariamente com opacity 0 para medir altura real
+            pop.style.visibility = 'hidden';
+            pop.style.opacity = '0';
+            pop.classList.remove('hidden');
+            const popRect = pop.getBoundingClientRect();
+            const popW = popRect.width || 288;
+            const popH = popRect.height || 220;
+            pop.classList.add('hidden');
+            pop.style.visibility = '';
+            pop.style.opacity = '';
+
             const btn = document.querySelector(`[onclick*="abrirNotaConta(${id})"]`);
             if (btn) {
                 const rect = btn.getBoundingClientRect();
-                const popW = 288; // w-72 = 18rem = 288px
-                const popH = 180; // altura estimada do popover
-                const spaceBelow = window.innerHeight - rect.bottom;
+                // Desconta a barra fixa do rodapé (~88px)
+                const footerH = 88;
+                const usableBottom = window.innerHeight - footerH;
+                const spaceBelow = usableBottom - rect.bottom;
                 let top, left;
-                // Abrir para cima se não há espaço abaixo
+                // Preferir abrir para cima quando há pouco espaço abaixo
                 if (spaceBelow < popH + 10) {
                     top = rect.top - popH - 8;
+                    // Garantir que não saia do topo da tela
+                    top = Math.max(top, 8);
                 } else {
                     top = rect.bottom + 8;
                 }
