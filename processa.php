@@ -467,6 +467,18 @@ switch ($acao) {
         if ($id) $pdo->prepare("DELETE FROM pessoas WHERE id = ?")->execute([$id]);
         break;
 
+    case 'salvar_nota_conta':
+        // Migração automática
+        try { $pdo->query("SELECT nota_conta FROM contas LIMIT 1"); } catch (Exception $e) {
+            $pdo->query("ALTER TABLE contas ADD COLUMN nota_conta TEXT DEFAULT NULL");
+        }
+        $id = filter_input(INPUT_POST, 'conta_id', FILTER_VALIDATE_INT);
+        $nota = trim($_POST['nota_conta'] ?? '');
+        if ($id) {
+            $pdo->prepare("UPDATE contas SET nota_conta = ? WHERE id = ?")->execute([$nota ?: null, $id]);
+        }
+        break;
+
     case 'salvar_comentario_pessoa':
         // Migração automática: adiciona coluna se ainda não existir
         try { $pdo->query("SELECT comentario FROM pessoas LIMIT 1"); } catch (Exception $e) {

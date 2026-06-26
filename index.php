@@ -17,6 +17,7 @@ $urlApi = 'https://hero-sms.com/stubs/handler_api.php';
 // Verificações de banco rápidas (migrações automáticas leves)
 try { $pdo->query("SELECT data_autenticacao FROM contas LIMIT 1"); } catch (Exception $e) { $pdo->query("ALTER TABLE contas ADD COLUMN data_autenticacao DATETIME NULL"); }
 try { $pdo->query("SELECT cookies FROM contas LIMIT 1"); } catch (Exception $e) { $pdo->query("ALTER TABLE contas ADD COLUMN cookies LONGTEXT NULL"); }
+try { $pdo->query("SELECT nota_conta FROM contas LIMIT 1"); } catch (Exception $e) { $pdo->query("ALTER TABLE contas ADD COLUMN nota_conta TEXT DEFAULT NULL"); }
 
 // Processamento de ações AJAX/Post direto na index (legado mantido para compatibilidade, mas limpo)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao'])) {
@@ -522,13 +523,28 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
                                 </form>
                             </td>
                             <td class="p-4 text-right pr-6">
-                                <div class="flex items-center justify-end gap-2">
+                                <div class="relative flex items-center justify-end gap-2">
                                     <button onclick="copiarContaUnica(this)" class="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition" title="Copiar Perfil"><i data-lucide="clipboard-copy" class="w-4 h-4"></i></button>
                                     <div class="w-px h-4 bg-slate-200 dark:border-slate-700"></div>
+                                    <button onclick="abrirNotaConta(<?= $conta['id'] ?>, <?= json_encode($conta['nota_conta'] ?? '') ?>)" class="p-2 rounded-lg transition <?= !empty($conta['nota_conta']) ? 'text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20' : 'text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800' ?>" title="<?= !empty($conta['nota_conta']) ? htmlspecialchars($conta['nota_conta']) : 'Adicionar comentário' ?>"><i data-lucide="message-square<?= !empty($conta['nota_conta']) ? '' : '-plus' ?>" class="w-4 h-4"></i></button>
                                     <button onclick="abrirModalEditarConta(<?= $conta['id'] ?>)" class="p-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition" title="Editar Conta"><i data-lucide="edit" class="w-4 h-4"></i></button>
                                     <button onclick="abrirModal('Regerar dados desta conta?', this.closest('tr').querySelector('.form-regerar'))" class="p-2 text-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg transition"><i data-lucide="refresh-cw" class="w-4 h-4"></i></button>
                                     <button onclick="abrirModal('Excluir conta permanentemente?', this.closest('tr').querySelector('.form-del'))" class="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                                     
+                                    <!-- Popover nota -->
+                                    <div id="nota-popover-<?= $conta['id'] ?>" class="hidden absolute right-0 z-30 bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 mt-2 w-72">
+                                        <p class="text-xs font-black text-slate-500 uppercase tracking-wider mb-2">Comentário da Conta</p>
+                                        <form method="POST" action="processa.php" class="space-y-2">
+                                            <input type="hidden" name="acao" value="salvar_nota_conta">
+                                            <input type="hidden" name="conta_id" value="<?= $conta['id'] ?>">
+                                            <textarea name="nota_conta" rows="3" placeholder="Ex: bm tanana feita, sem cookie..." class="w-full text-xs p-2 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-900 outline-none focus:border-blue-500 resize-none transition"><?= htmlspecialchars($conta['nota_conta'] ?? '') ?></textarea>
+                                            <div class="flex gap-2">
+                                                <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-1.5 rounded-xl text-xs font-bold transition">Salvar</button>
+                                                <button type="button" onclick="fecharNotaConta(<?= $conta['id'] ?>)" class="px-3 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 rounded-xl text-xs font-bold transition">Cancelar</button>
+                                            </div>
+                                        </form>
+                                    </div>
+
                                     <form method="POST" action="processa.php" class="form-regerar hidden"><input type="hidden" name="acao" value="regerar_conta"><input type="hidden" name="conta_id" value="<?= $conta['id'] ?>"></form>
                                     <form method="POST" action="processa.php" class="form-del hidden"><input type="hidden" name="acao" value="del_conta"><input type="hidden" name="conta_id" value="<?= $conta['id'] ?>"></form>
                                 </div>
@@ -1023,6 +1039,39 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
             formAlvo = null;
         }
         function confirmarModal() { if(formAlvo) formAlvo.submit(); }
+
+        // ── Nota / Comentário por Conta ───────────────────────────────
+        let notaAberta = null;
+        function abrirNotaConta(id) {
+            if (notaAberta && notaAberta !== id) {
+                const old = document.getElementById('nota-popover-' + notaAberta);
+                if (old) old.classList.add('hidden');
+            }
+            const pop = document.getElementById('nota-popover-' + id);
+            if (!pop) return;
+            const isHidden = pop.classList.contains('hidden');
+            pop.classList.toggle('hidden');
+            notaAberta = isHidden ? id : null;
+            if (isHidden) {
+                // Foca o textarea ao abrir
+                const ta = pop.querySelector('textarea');
+                if (ta) setTimeout(() => ta.focus(), 50);
+            }
+        }
+        function fecharNotaConta(id) {
+            const pop = document.getElementById('nota-popover-' + id);
+            if (pop) pop.classList.add('hidden');
+            if (notaAberta === id) notaAberta = null;
+        }
+        // Fechar ao clicar fora
+        document.addEventListener('click', function(e) {
+            if (!notaAberta) return;
+            const pop = document.getElementById('nota-popover-' + notaAberta);
+            if (pop && !pop.classList.contains('hidden') && !pop.contains(e.target)) {
+                const btn = e.target.closest(`[onclick*="abrirNotaConta(${notaAberta})"]`);
+                if (!btn) fecharNotaConta(notaAberta);
+            }
+        }, true);
 
         function copiarContaUnica(btn) {
             const row = btn.closest('tr');
