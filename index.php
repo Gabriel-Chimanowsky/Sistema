@@ -108,29 +108,56 @@ if ($dir !== 'ASC' && $dir !== 'DESC') $dir = 'DESC';
 $stmtPessoas = $pdo->query("SELECT * FROM pessoas ORDER BY nome ASC");
 $pessoas = $stmtPessoas->fetchAll();
 
-// Paginação
-$limit = 50;
+// Filtro de comentario
+$filtroComentario = $_GET['comentario'] ?? '';
+
+// Paginacao - limit vindo do GET
+$limitOpcoes = [25, 50, 100, 200, 500];
+$limit = filter_input(INPUT_GET, 'limit', FILTER_VALIDATE_INT) ?: 50;
+if (!in_array($limit, $limitOpcoes)) $limit = 50;
+
 $page = filter_input(INPUT_GET, 'page', FILTER_VALIDATE_INT) ?: 1;
 if ($page < 1) $page = 1;
 
-$totalContasQuery = $pdo->query("SELECT COUNT(*) FROM contas")->fetchColumn();
+// WHERE dinamico
+$whereClause = '';
+if ($filtroComentario === 'com') {
+    $whereClause = 'WHERE nota_conta IS NOT NULL AND nota_conta <> ""';
+} elseif ($filtroComentario === 'sem') {
+    $whereClause = 'WHERE (nota_conta IS NULL OR nota_conta = "")';
+}
+
+$totalContasQuery = $pdo->query("SELECT COUNT(*) FROM contas {$whereClause}")->fetchColumn();
 $totalPages = max(1, ceil($totalContasQuery / $limit));
 if ($page > $totalPages) $page = $totalPages;
 
 $offset = ($page - 1) * $limit;
 
 $ordemSQL = "{$sort} {$dir}";
-$stmtContas = $pdo->prepare("SELECT *, UNIX_TIMESTAMP(data_criacao) as criacao_unix, UNIX_TIMESTAMP(data_autenticacao) as auth_unix, UNIX_TIMESTAMP(data_exportado) as export_unix FROM contas ORDER BY {$ordemSQL} LIMIT ? OFFSET ?");
+$stmtContas = $pdo->prepare("SELECT *, UNIX_TIMESTAMP(data_criacao) as criacao_unix, UNIX_TIMESTAMP(data_autenticacao) as auth_unix, UNIX_TIMESTAMP(data_exportado) as export_unix FROM contas {$whereClause} ORDER BY {$ordemSQL} LIMIT ? OFFSET ?");
 $stmtContas->bindValue(1, $limit, PDO::PARAM_INT);
 $stmtContas->bindValue(2, $offset, PDO::PARAM_INT);
 $stmtContas->execute();
 $contas = $stmtContas->fetchAll();
 $tempoDb = time();
 
+function buildQuery(array $extra = []): string {
+    global $sort, $dir, $limit, $filtroComentario;
+    $params = array_merge([
+        'sort'       => $sort,
+        'dir'        => $dir,
+        'limit'      => $limit,
+        'comentario' => $filtroComentario,
+    ], $extra);
+    $params = array_filter($params, fn($v) => $v !== '' && $v !== null);
+    return '?' . http_build_query($params);
+}
+
 function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, string $dirAtual): string {
     $novoDir = ($sortAtual === $coluna && $dirAtual === 'ASC') ? 'DESC' : 'ASC';
     $icone = ($sortAtual === $coluna) ? ($dirAtual === 'ASC' ? ' 🔼' : ' 🔽') : '';
-    return "<a href='?sort={$coluna}&dir={$novoDir}' class='flex items-center gap-1 hover:text-blue-500 transition'>{$nomeExibicao}{$icone}</a>";
+    $q = buildQuery(['sort' => $coluna, 'dir' => $novoDir, 'page' => 1]);
+    return "<a href='{$q}' class='flex items-center gap-1 hover:text-blue-500 transition'>{$nomeExibicao}{$icone}</a>";
 }
 ?>
 <!DOCTYPE html>
@@ -271,6 +298,51 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
                     <i data-lucide="check-square" class="w-6 h-6"></i>
                 </div>
             </div>
+        </div>
+
+        <!-- Barra de Filtros e Controles -->
+        <div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm px-5 py-3 flex flex-wrap items-center gap-3">
+            <span class="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i>
+                Filtros
+            </span>
+
+            <!-- Filtro: Comentário -->
+            <div class="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 rounded-xl p-1">
+                <span class="text-[10px] font-black text-slate-400 uppercase px-2">Comentário:</span>
+                <?php
+                $qTodos = buildQuery(['comentario' => '', 'page' => 1]);
+                $qCom   = buildQuery(['comentario' => 'com', 'page' => 1]);
+                $qSem   = buildQuery(['comentario' => 'sem', 'page' => 1]);
+                ?>
+                <a href="<?= $qTodos ?>" class="px-3 py-1 rounded-lg text-[11px] font-black transition <?= $filtroComentario === '' ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300' ?>">Todos</a>
+                <a href="<?= $qCom ?>" class="px-3 py-1 rounded-lg text-[11px] font-black transition flex items-center gap-1 <?= $filtroComentario === 'com' ? 'bg-amber-500 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300' ?>">
+                    <i data-lucide="message-square" class="w-3 h-3"></i> Com
+                </a>
+                <a href="<?= $qSem ?>" class="px-3 py-1 rounded-lg text-[11px] font-black transition flex items-center gap-1 <?= $filtroComentario === 'sem' ? 'bg-slate-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300' ?>">
+                    <i data-lucide="message-square-off" class="w-3 h-3"></i> Sem
+                </a>
+            </div>
+
+            <div class="flex-1"></div>
+
+            <!-- Por página -->
+            <div class="flex items-center gap-2">
+                <span class="text-[11px] font-black text-slate-400 uppercase tracking-widest">Por página:</span>
+                <div class="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 rounded-xl p-1">
+                    <?php foreach ([25, 50, 100, 200, 500] as $op): ?>
+                        <a href="<?= buildQuery(['limit' => $op, 'page' => 1]) ?>"
+                           class="px-3 py-1 rounded-lg text-[11px] font-black transition <?= $limit === $op ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300' ?>"
+                           onclick="localStorage.setItem('dollfinn_limit','<?= $op ?>')">
+                            <?= $op ?>
+                        </a>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+
+            <span class="text-[11px] font-semibold text-slate-400">
+                <?= $totalContasQuery ?> conta<?= $totalContasQuery != 1 ? 's' : '' ?> encontrada<?= $totalContasQuery != 1 ? 's' : '' ?>
+            </span>
         </div>
 
         <!-- Table Container -->
@@ -575,14 +647,16 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
             
             <!-- Barra de Paginação -->
             <?php if ($totalPages > 1): ?>
-                <div class="bg-slate-50 dark:bg-slate-800/20 px-6 py-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                <div class="bg-slate-50 dark:bg-slate-800/20 px-6 py-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-4 flex-wrap">
                     <div class="text-xs text-slate-500 font-semibold">
-                        Mostrando página <span class="text-slate-800 dark:text-slate-200 font-extrabold"><?= $page ?></span> de <span class="text-slate-800 dark:text-slate-200 font-extrabold"><?= $totalPages ?></span> (Total: <?= $totalContasQuery ?> contas)
+                        Página <span class="text-slate-800 dark:text-slate-200 font-extrabold"><?= $page ?></span>
+                        de <span class="text-slate-800 dark:text-slate-200 font-extrabold"><?= $totalPages ?></span>
+                        &nbsp;·&nbsp; <?= $totalContasQuery ?> conta<?= $totalContasQuery != 1 ? 's' : '' ?> total
                     </div>
                     <div class="flex items-center gap-1.5">
                         <!-- Botão Anterior -->
                         <?php if ($page > 1): ?>
-                            <a href="?page=<?= $page - 1 ?>&sort=<?= $sort ?>&dir=<?= $dir ?>" class="p-2 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-xl transition-all shadow-sm flex items-center justify-center text-slate-600 dark:text-slate-300">
+                            <a href="<?= buildQuery(['page' => $page - 1]) ?>" class="p-2 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-xl transition-all shadow-sm flex items-center justify-center text-slate-600 dark:text-slate-300">
                                 <i data-lucide="chevron-left" class="w-4 h-4"></i>
                             </a>
                         <?php else: ?>
@@ -595,16 +669,16 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
                         <?php
                         $startPage = max(1, $page - 2);
                         $endPage = min($totalPages, $page + 2);
-                        for ($p = $startPage; $p <= $endPage; $p++):
+                        for ($pg = $startPage; $pg <= $endPage; $pg++):
                         ?>
-                            <a href="?page=<?= $p ?>&sort=<?= $sort ?>&dir=<?= $dir ?>" class="px-3.5 py-1.5 text-xs font-black rounded-xl border transition-all shadow-sm <?= $p === $page ? 'bg-blue-600 border-blue-600 text-white shadow-blue-600/10' : 'bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300' ?>">
-                                <?= $p ?>
+                            <a href="<?= buildQuery(['page' => $pg]) ?>" class="px-3.5 py-1.5 text-xs font-black rounded-xl border transition-all shadow-sm <?= $pg === $page ? 'bg-blue-600 border-blue-600 text-white shadow-blue-600/10' : 'bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300' ?>">
+                                <?= $pg ?>
                             </a>
                         <?php endfor; ?>
 
                         <!-- Botão Próximo -->
                         <?php if ($page < $totalPages): ?>
-                            <a href="?page=<?= $page + 1 ?>&sort=<?= $sort ?>&dir=<?= $dir ?>" class="p-2 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-xl transition-all shadow-sm flex items-center justify-center text-slate-600 dark:text-slate-300">
+                            <a href="<?= buildQuery(['page' => $page + 1]) ?>" class="p-2 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-xl transition-all shadow-sm flex items-center justify-center text-slate-600 dark:text-slate-300">
                                 <i data-lucide="chevron-right" class="w-4 h-4"></i>
                             </a>
                         <?php else: ?>
@@ -878,6 +952,20 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
             if(p) document.getElementById('paisSelect').value = p;
         }
         loadSettings();
+
+        // ── Persistência de itens por página ─────────────────────────
+        // Se a URL não tem &limit=, aplica o valor salvo no localStorage
+        (function() {
+            const params = new URLSearchParams(window.location.search);
+            if (!params.has('limit')) {
+                const saved = localStorage.getItem('dollfinn_limit');
+                const validos = ['25','50','100','200','500'];
+                if (saved && validos.includes(saved) && saved !== '50') {
+                    params.set('limit', saved);
+                    window.location.replace('?' + params.toString());
+                }
+            }
+        })();
 
         // ── Ações em Lote ─────────────────────────────────────────────
         function getSelecionados() {
