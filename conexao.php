@@ -93,12 +93,21 @@ try {
         // 3. Tabela slack_listas
         $pdo->query("CREATE TABLE IF NOT EXISTS `slack_listas` (
             `id` int(11) NOT NULL AUTO_INCREMENT,
-            `mes` varchar(7) NOT NULL UNIQUE COMMENT 'Formato YYYY-MM',
+            `mes` varchar(7) NULL UNIQUE COMMENT 'Formato YYYY-MM',
+            `nome` varchar(255) NULL,
             `list_id` varchar(50) NOT NULL,
             `primary_col_id` varchar(50) NOT NULL,
             `criado_em` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (`id`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        // Garantir novas colunas da tabela slack_listas
+        $stmtSlackListasCols = $pdo->query("SHOW COLUMNS FROM slack_listas");
+        $colunasSlackListas = array_column($stmtSlackListasCols->fetchAll(), 'Field');
+        if (!in_array('nome', $colunasSlackListas)) {
+            $pdo->query("ALTER TABLE slack_listas ADD COLUMN nome VARCHAR(255) NULL");
+        }
+        $pdo->query("ALTER TABLE slack_listas MODIFY COLUMN mes VARCHAR(7) NULL");
 
         // 4. Tabela slack_lotes_count (Para evitar problemas de cache da API do Slack)
         $pdo->query("CREATE TABLE IF NOT EXISTS `slack_lotes_count` (

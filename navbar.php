@@ -17,6 +17,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 <a href="index.php" class="px-4 py-2 rounded-xl <?= $current_page == 'index.php' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800' ?> transition">Contas</a>
                 <a href="pessoas.php" class="px-4 py-2 rounded-xl <?= $current_page == 'pessoas.php' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800' ?> transition">Pessoas</a>
                 <a href="apps.php" class="px-4 py-2 rounded-xl <?= $current_page == 'apps.php' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800' ?> transition">Apps</a>
+                <a href="slack.php" class="px-4 py-2 rounded-xl <?= $current_page == 'slack.php' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800' ?> transition">Slack</a>
                 <a href="config.php" class="px-4 py-2 rounded-xl <?= $current_page == 'config.php' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800' ?> transition">Ajustes</a>
             <?php endif; ?>
             <a href="relatorio.php" class="px-4 py-2 rounded-xl <?= $current_page == 'relatorio.php' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800' ?> transition">Financeiro</a>
