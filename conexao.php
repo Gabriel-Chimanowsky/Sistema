@@ -88,6 +88,15 @@ try {
         if (!in_array('preco_pagina', $colunasConf)) {
             $pdo->query("ALTER TABLE configuracoes ADD COLUMN preco_pagina DECIMAL(10,2) NOT NULL DEFAULT 10.00");
         }
+        if (!in_array('cloudflare_token', $colunasConf)) {
+            $pdo->query("ALTER TABLE configuracoes ADD COLUMN cloudflare_token VARCHAR(255) NULL");
+        }
+        if (!in_array('cloudflare_zone_id', $colunasConf)) {
+            $pdo->query("ALTER TABLE configuracoes ADD COLUMN cloudflare_zone_id VARCHAR(255) NULL");
+        }
+        if (!in_array('cloudflare_dest_email', $colunasConf)) {
+            $pdo->query("ALTER TABLE configuracoes ADD COLUMN cloudflare_dest_email VARCHAR(255) NULL");
+        }
         
 
         // 3. Tabela slack_listas

@@ -492,14 +492,30 @@ switch ($acao) {
         break;
 
     case 'atualizar_config':
-        $sql = "UPDATE configuracoes SET senha_padrao = ?, email_contador = ?, genero_padrao = ?, pais_padrao = ?, email_prefixo = ?, email_dominio = ?, slack_token = ?, slack_canal_notificacao = ?, preco_perfil = ?, preco_bm = ?, preco_pagina = ?";
+        $sql = "UPDATE configuracoes SET senha_padrao = ?, email_contador = ?, genero_padrao = ?, pais_padrao = ?, email_prefixo = ?, email_dominio = ?, slack_token = ?, slack_canal_notificacao = ?, preco_perfil = ?, preco_bm = ?, preco_pagina = ?, cloudflare_token = ?, cloudflare_zone_id = ?, cloudflare_dest_email = ?";
         $pdo->prepare($sql)->execute([
             $_POST['senha_padrao'], $_POST['email_contador'], $_POST['genero_padrao'], 
             $_POST['pais_padrao'], $_POST['email_prefixo'], $_POST['email_dominio'],
             $_POST['slack_token'], $_POST['slack_canal_notificacao'],
-            $_POST['preco_perfil'], $_POST['preco_bm'], $_POST['preco_pagina']
+            $_POST['preco_perfil'], $_POST['preco_bm'], $_POST['preco_pagina'],
+            $_POST['cloudflare_token'], $_POST['cloudflare_zone_id'], $_POST['cloudflare_dest_email']
         ]);
         break;
+
+    case 'salvar_cloudflare_config':
+        header('Content-Type: application/json');
+        $token = trim($_POST['cloudflare_token'] ?? '');
+        $zone_id = trim($_POST['cloudflare_zone_id'] ?? '');
+        $dest_email = trim($_POST['cloudflare_dest_email'] ?? '');
+        
+        try {
+            $sql = "UPDATE configuracoes SET cloudflare_token = ?, cloudflare_zone_id = ?, cloudflare_dest_email = ?";
+            $pdo->prepare($sql)->execute([$token, $zone_id, $dest_email]);
+            echo json_encode(['sucesso' => true, 'mensagem' => 'Credenciais salvas com sucesso!']);
+        } catch (Exception $e) {
+            echo json_encode(['sucesso' => false, 'erro' => 'Erro ao salvar credenciais: ' . $e->getMessage()]);
+        }
+        exit;
 
     case 'add_desconto':
         // Migração automática

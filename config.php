@@ -162,6 +162,46 @@ $config = $stmt->fetch();
                     </div>
                 </div>
             </div>
+
+            <!-- Nova Seção: Integração Cloudflare Email Routing -->
+            <div class="border-t pt-10 dark:border-slate-800 grid grid-cols-1 md:grid-cols-2 gap-10">
+                <div class="space-y-6">
+                    <h3 class="text-xs font-black uppercase tracking-[0.2em] text-slate-400 border-b pb-2 dark:border-slate-800">Credenciais Cloudflare</h3>
+                    
+                    <div class="space-y-2">
+                        <label class="block text-sm font-bold text-slate-500 uppercase tracking-wider ml-1">Cloudflare API Token</label>
+                        <input type="password" name="cloudflare_token" value="<?= htmlspecialchars($config['cloudflare_token'] ?? '') ?>" 
+                            class="w-full bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-blue-500 p-4 rounded-2xl outline-none transition-all font-bold font-mono" placeholder="Seu Cloudflare API Token...">
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="block text-sm font-bold text-slate-500 uppercase tracking-wider ml-1">Zone ID</label>
+                        <input type="text" name="cloudflare_zone_id" value="<?= htmlspecialchars($config['cloudflare_zone_id'] ?? '') ?>" 
+                            class="w-full bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-blue-500 p-4 rounded-2xl outline-none transition-all font-bold font-mono" placeholder="Zone ID do Domínio...">
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="block text-sm font-bold text-slate-500 uppercase tracking-wider ml-1">E-mail de Destino Padrão</label>
+                        <input type="email" name="cloudflare_dest_email" value="<?= htmlspecialchars($config['cloudflare_dest_email'] ?? '') ?>" 
+                            class="w-full bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-blue-500 p-4 rounded-2xl outline-none transition-all font-bold" placeholder="seuemail@gmail.com">
+                    </div>
+                </div>
+
+                <div class="space-y-6 flex flex-col justify-end">
+                    <div class="bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/50 p-6 rounded-3xl text-xs space-y-3">
+                        <div class="font-bold text-blue-800 dark:text-blue-400 flex items-center gap-2">
+                            <i data-lucide="info" class="w-4 h-4"></i>
+                            Sobre a Automação Cloudflare
+                        </div>
+                        <p class="text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
+                            Estas chaves são utilizadas na aba <strong>Cloudflare</strong> para a criação em massa de redirecionamentos de e-mail automaticamente.
+                        </p>
+                        <p class="text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
+                            Certifique-se de que o token possua as permissões de <code>Email Routing Rules: Edit</code> e <code>Zone: Read</code> na Cloudflare.
+                        </p>
+                    </div>
+                </div>
+            </div>
         </form>
     </div>
 
