@@ -689,6 +689,17 @@ switch ($acao) {
         }
         break;
 
+    case 'del_apps_massa':
+        $ids = $_POST['ids'] ?? '';
+        if (!empty($ids)) {
+            $idsArray = array_filter(array_map('intval', explode(',', $ids)));
+            if (count($idsArray) > 0) {
+                $in = str_repeat('?,', count($idsArray) - 1) . '?';
+                $pdo->prepare("DELETE FROM apps WHERE id IN ($in)")->execute($idsArray);
+            }
+        }
+        break;
+
     case 'verificar_app_status':
         header('Content-Type: application/json');
         $id = filter_input(INPUT_POST, 'app_id', FILTER_VALIDATE_INT);

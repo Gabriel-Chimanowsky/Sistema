@@ -254,6 +254,10 @@ function linkSortApp($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
 
             <!-- Action Buttons -->
             <div class="flex items-center gap-2">
+                <button type="button" id="btnDeleteSelected" onclick="excluirAppsSelecionados()" class="hidden bg-rose-600 hover:bg-rose-750 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-rose-600/20 transition active:scale-95 text-xs">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    Excluir Selecionados (<span id="selectedAppsCount">0</span>)
+                </button>
                 <button type="button" id="btnVerifyAll" onclick="verificarTodosApps()" class="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition active:scale-95 text-xs">
                     <i data-lucide="refresh-cw" id="iconVerifyAll" class="w-4 h-4"></i>
                     Verificar Todos
@@ -278,6 +282,7 @@ function linkSortApp($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
                 <table class="w-full text-left border-collapse text-sm">
                     <thead>
                         <tr class="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-slate-500 font-bold uppercase text-[11px] tracking-widest">
+                            <th class="p-4 w-12 text-center"><input type="checkbox" id="selectAllApps" onchange="toggleSelectAllApps(this)" class="w-4 h-4 rounded-md border-slate-300 dark:border-slate-600 cursor-pointer"></th>
                             <th class="p-4 w-16 text-center"><?= linkSortApp('id', 'ID', $sort, $dir) ?></th>
                             <th class="p-4"><?= linkSortApp('nome', 'Nome do Aplicativo', $sort, $dir) ?></th>
                             <th class="p-4"><?= linkSortApp('app_id', 'ID do App (Client ID)', $sort, $dir) ?></th>
@@ -292,6 +297,7 @@ function linkSortApp($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
                     <tbody class="divide-y divide-slate-100 dark:divide-slate-800" id="appsTableBody">
                         <?php foreach ($appsList as $app): ?>
                             <tr class="tr-hover group transition-colors" data-id="<?= $app['id'] ?>" data-json='<?= json_encode($app) ?>'>
+                                <td class="p-4 text-center"><input type="checkbox" class="check-app w-4 h-4 rounded-md border-slate-300 dark:border-slate-600 cursor-pointer" data-id="<?= $app['id'] ?>" onchange="atualizarBotaoExclusaoMassa()"></td>
                                 <td class="p-4 text-center font-bold text-slate-400">#<?= $app['id'] ?></td>
                                 <td class="p-4">
                                     <span class="font-extrabold text-slate-800 dark:text-slate-200"><?= htmlspecialchars($app['nome']) ?></span>
@@ -389,7 +395,7 @@ function linkSortApp($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
 
                         <?php if (empty($appsList)): ?>
                             <tr>
-                                <td colspan="9" class="p-12 text-center">
+                                <td colspan="10" class="p-12 text-center">
                                     <i data-lucide="layout-grid" class="w-12 h-12 text-slate-300 mx-auto mb-4"></i>
                                     <p class="text-slate-400 font-bold">Nenhum aplicativo cadastrado ou encontrado com os filtros selecionados.</p>
                                 </td>
@@ -550,6 +556,12 @@ function linkSortApp($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
             </form>
         </div>
     </div>
+
+    <!-- Form oculto para exclusão em massa -->
+    <form id="form-del-massa" method="POST" action="processa.php" class="hidden">
+        <input type="hidden" name="acao" value="del_apps_massa">
+        <input type="hidden" name="ids" id="ids-del-massa" value="">
+    </form>
 
     <!-- Modal Layout de Confirmação Exclusão -->
     <div id="modalConfirmacao" class="hidden fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-[100] items-center justify-center p-4">
@@ -900,6 +912,43 @@ function linkSortApp($coluna, $nomeExibicao, $sortAtual, $dirAtual) {
                 });
             }, 3000); // 3 segundos após carregar
         });
+
+        // ── Funções de Ação em Lote (Exclusão em Massa) ──────────────────
+        function atualizarBotaoExclusaoMassa() {
+            const checks = document.querySelectorAll('.check-app:checked');
+            const btn = document.getElementById('btnDeleteSelected');
+            const countSpan = document.getElementById('selectedAppsCount');
+            
+            if (checks.length > 0) {
+                btn.classList.remove('hidden');
+                countSpan.textContent = checks.length;
+            } else {
+                btn.classList.add('hidden');
+            }
+            
+            // Atualiza o checkbox mestre
+            const allChecks = document.querySelectorAll('.check-app');
+            const selectAll = document.getElementById('selectAllApps');
+            if (selectAll) {
+                selectAll.checked = (checks.length === allChecks.length && allChecks.length > 0);
+            }
+        }
+
+        function toggleSelectAllApps(master) {
+            const checks = document.querySelectorAll('.check-app');
+            checks.forEach(c => c.checked = master.checked);
+            atualizarBotaoExclusaoMassa();
+        }
+
+        function excluirAppsSelecionados() {
+            const checks = document.querySelectorAll('.check-app:checked');
+            if (checks.length === 0) return;
+            
+            const ids = Array.from(checks).map(c => c.dataset.id).join(',');
+            document.getElementById('ids-del-massa').value = ids;
+            
+            abrirModal(`Deseja excluir permanentemente os ${checks.length} aplicativos selecionados?`, document.getElementById('form-del-massa'));
+        }
     </script>
 </body>
 </html>

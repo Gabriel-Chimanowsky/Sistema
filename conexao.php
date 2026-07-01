@@ -664,7 +664,7 @@ if (!function_exists('verificarAppStatusMeta')) {
                     $devMode = !$isLive;
                 }
                 $status = $devMode ? 'analise' : 'aprovado';
-                $status_conexao = $devMode ? 'caiu' : 'online';
+                $status_conexao = 'online';
 
                 // 2. Buscar status detalhado das permissões do aplicativo
                 $chPerm = curl_init();
@@ -691,7 +691,7 @@ if (!function_exists('verificarAppStatusMeta')) {
                 foreach ($tracked_arr as $p) {
                     $p_status = $approved_list[$p] ?? 'unapproved';
                     $permissions_status[$p] = $p_status;
-                    if ($p_status !== 'live') {
+                    if ($p_status !== 'live' && $p_status !== 'granted' && $p_status !== 'aprovado') {
                         $all_live = false;
                     }
                 }
