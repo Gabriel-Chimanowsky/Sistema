@@ -70,7 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao'])) {
     }
 
     if ($_POST['acao'] === 'editar_2fa_direto') {
-        $pdo->prepare("UPDATE contas SET codigo_2fa = ?, chave_2fa = ? WHERE id = ?")->execute([$_POST['codigo_2fa'], $_POST['chave_2fa'], $_POST['conta_id']]);
+        $pdo->prepare("UPDATE contas SET codigo_2fa = ? WHERE id = ?")->execute([$_POST['codigo_2fa'], $_POST['conta_id']]);
         header("Location: index.php"); exit;
     }
 }
@@ -414,11 +414,12 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
                                     <?php if ($conta['codigo_2fa']): ?>
                                         <div class="flex items-center gap-2 text-[10px] font-mono bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg">
                                             <span class="text-green-600 font-bold uppercase">2FA:</span>
-                                            <span><?= $conta['codigo_2fa'] ?></span>
-                                            <button onclick="copiar('<?= $conta['codigo_2fa'] ?>', 'Código 2FA copiado')" class="ml-auto"><i data-lucide="copy" class="w-3 h-3"></i></button>
+                                            <span class="truncate w-12">Salvo</span>
+                                            <button onclick="colar2FADireto(<?= $conta['id'] ?>)" class="text-slate-500 hover:text-blue-500 ml-auto" title="Editar 2FA"><i data-lucide="edit-3" class="w-3 h-3"></i></button>
+                                            <button onclick="copiar(JSON.parse(this.closest('tr').dataset.json).codigo_2fa, 'Código 2FA copiado')"><i data-lucide="copy" class="w-3 h-3"></i></button>
                                         </div>
                                     <?php else: ?>
-                                        <button onclick="toggleEdit2FA(<?= $conta['id'] ?>)" class="text-[10px] font-bold text-blue-500 hover:underline">+ Adicionar 2FA</button>
+                                        <button onclick="colar2FADireto(<?= $conta['id'] ?>)" class="text-[10px] font-bold text-blue-500 hover:underline">+ Colar 2FA</button>
                                     <?php endif; ?>
                                     
                                     <?php if ($conta['cookies']): ?>
@@ -431,20 +432,6 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
                                     <?php else: ?>
                                         <button onclick="colarCookiesDireto(<?= $conta['id'] ?>)" class="text-[10px] font-bold text-slate-500 hover:underline">+ Colar Cookies</button>
                                     <?php endif; ?>
-                                </div>
-                                
-                                <!-- Edit Popovers (Hidden by default) -->
-                                <div id="edit-2fa-<?= $conta['id'] ?>" class="hidden absolute z-10 bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 mt-2 w-64">
-                                    <form method="POST" action="processa.php" class="space-y-3">
-                                        <input type="hidden" name="acao" value="salvar_2fa">
-                                        <input type="hidden" name="conta_id" value="<?= $conta['id'] ?>">
-                                        <input type="text" name="codigo_2fa" placeholder="Código..." class="w-full text-xs p-2 rounded-lg border dark:bg-slate-900 outline-none">
-                                        <input type="text" name="chave_2fa" placeholder="Chave..." class="w-full text-xs p-2 rounded-lg border dark:bg-slate-900 outline-none">
-                                        <div class="flex gap-2">
-                                            <button type="submit" class="flex-1 bg-blue-600 text-white py-1.5 rounded-lg text-xs font-bold">Salvar</button>
-                                            <button type="button" onclick="toggleEdit2FA(<?= $conta['id'] ?>)" class="px-3 bg-slate-100 dark:bg-slate-700 rounded-lg text-xs font-bold">X</button>
-                                        </div>
-                                    </form>
                                 </div>
                             </td>
                             <td class="p-4 text-center">
@@ -1066,9 +1053,47 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
             btn.innerHTML = original; lucide.createIcons();
         }
 
-        function toggleEdit2FA(id) {
-            const el = document.getElementById('edit-2fa-' + id);
-            el.classList.toggle('hidden');
+        async function colar2FADireto(id) {
+            let text = '';
+            try {
+                text = await navigator.clipboard.readText();
+            } catch (err) {
+                console.log('Erro ao ler clipboard diretamente:', err);
+            }
+            
+            if (!text || !text.trim()) {
+                const tr = document.querySelector(`tr[data-id="${id}"]`);
+                let existing2FA = '';
+                if (tr && tr.dataset.json) {
+                    try {
+                        const data = JSON.parse(tr.dataset.json);
+                        if (data.codigo_2fa) {
+                            existing2FA = data.codigo_2fa;
+                        }
+                    } catch (e) {}
+                }
+                text = prompt("Cole o código 2FA abaixo e clique em OK:", existing2FA);
+            }
+            
+            if (text && text.trim()) {
+                const text2fa = text.trim();
+                const fd = new FormData();
+                fd.append('acao', 'salvar_2fa');
+                fd.append('conta_id', id);
+                fd.append('codigo_2fa', text2fa);
+                
+                try {
+                    const res = await fetch('processa.php', { method: 'POST', body: fd });
+                    if (res.ok) {
+                        mostrarToast('2FA salvo com sucesso!');
+                        setTimeout(() => window.location.reload(), 500);
+                    } else {
+                        mostrarToast('Erro ao salvar 2FA.');
+                    }
+                } catch (e) {
+                    mostrarToast('Erro de rede ao salvar 2FA.');
+                }
+            }
         }
 
         async function colarCookiesDireto(id) {

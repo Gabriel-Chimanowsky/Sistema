@@ -445,9 +445,8 @@ switch ($acao) {
     case 'salvar_2fa':
         $id = filter_input(INPUT_POST, 'conta_id', FILTER_VALIDATE_INT);
         $codigo = trim($_POST['codigo_2fa'] ?? '');
-        $chave = trim($_POST['chave_2fa'] ?? '');
-        if ($id && $codigo && $chave) {
-            $pdo->prepare("UPDATE contas SET codigo_2fa = ?, chave_2fa = ? WHERE id = ?")->execute([$codigo, $chave, $id]);
+        if ($id) {
+            $pdo->prepare("UPDATE contas SET codigo_2fa = ? WHERE id = ?")->execute([$codigo, $id]);
         }
         break;
 
