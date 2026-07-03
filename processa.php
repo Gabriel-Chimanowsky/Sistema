@@ -446,7 +446,15 @@ switch ($acao) {
         $id = filter_input(INPUT_POST, 'conta_id', FILTER_VALIDATE_INT);
         $codigo = trim($_POST['codigo_2fa'] ?? '');
         if ($id) {
-            $pdo->prepare("UPDATE contas SET codigo_2fa = ? WHERE id = ?")->execute([$codigo, $id]);
+            $stmt = $pdo->prepare("SELECT status FROM contas WHERE id = ?");
+            $stmt->execute([$id]);
+            $statusAtual = $stmt->fetchColumn();
+            
+            if ($codigo !== '' && $statusAtual !== 'exportado') {
+                $pdo->prepare("UPDATE contas SET codigo_2fa = ?, status = 'autenticada', data_autenticacao = NOW() WHERE id = ?")->execute([$codigo, $id]);
+            } else {
+                $pdo->prepare("UPDATE contas SET codigo_2fa = ? WHERE id = ?")->execute([$codigo, $id]);
+            }
         }
         break;
 
@@ -624,8 +632,17 @@ switch ($acao) {
         $codigo_2fa = trim($_POST['codigo_2fa'] ?? '');
         
         if ($id) {
-            $pdo->prepare("UPDATE contas SET nome = ?, sobrenome = ?, email = ?, username = ?, senha = ?, codigo_2fa = ? WHERE id = ?")
-                ->execute([$nome, $sobrenome, $email, $username, $senha, $codigo_2fa, $id]);
+            $stmt = $pdo->prepare("SELECT status FROM contas WHERE id = ?");
+            $stmt->execute([$id]);
+            $statusAtual = $stmt->fetchColumn();
+            
+            if ($codigo_2fa !== '' && $statusAtual !== 'exportado') {
+                $pdo->prepare("UPDATE contas SET nome = ?, sobrenome = ?, email = ?, username = ?, senha = ?, codigo_2fa = ?, status = 'autenticada', data_autenticacao = NOW() WHERE id = ?")
+                    ->execute([$nome, $sobrenome, $email, $username, $senha, $codigo_2fa, $id]);
+            } else {
+                $pdo->prepare("UPDATE contas SET nome = ?, sobrenome = ?, email = ?, username = ?, senha = ?, codigo_2fa = ? WHERE id = ?")
+                    ->execute([$nome, $sobrenome, $email, $username, $senha, $codigo_2fa, $id]);
+            }
         }
         break;
 

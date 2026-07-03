@@ -70,7 +70,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao'])) {
     }
 
     if ($_POST['acao'] === 'editar_2fa_direto') {
-        $pdo->prepare("UPDATE contas SET codigo_2fa = ? WHERE id = ?")->execute([$_POST['codigo_2fa'], $_POST['conta_id']]);
+        $codigo = trim($_POST['codigo_2fa'] ?? '');
+        $conta_id = $_POST['conta_id'];
+        
+        $stmt = $pdo->prepare("SELECT status FROM contas WHERE id = ?");
+        $stmt->execute([$conta_id]);
+        $statusAtual = $stmt->fetchColumn();
+        
+        if ($codigo !== '' && $statusAtual !== 'exportado') {
+            $pdo->prepare("UPDATE contas SET codigo_2fa = ?, status = 'autenticada', data_autenticacao = NOW() WHERE id = ?")->execute([$codigo, $conta_id]);
+        } else {
+            $pdo->prepare("UPDATE contas SET codigo_2fa = ? WHERE id = ?")->execute([$codigo, $conta_id]);
+        }
         header("Location: index.php"); exit;
     }
 }
