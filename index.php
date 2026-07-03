@@ -89,6 +89,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao'])) {
 // Stats
 $totalContas = $pdo->query("SELECT COUNT(*) FROM contas")->fetchColumn();
 $contasCriadasHoje = $pdo->query("SELECT COUNT(*) FROM contas WHERE DATE(data_criacao) = CURDATE()")->fetchColumn();
+$contasAutenticadasHoje = $pdo->query("SELECT COUNT(*) FROM contas WHERE DATE(data_autenticacao) = CURDATE()")->fetchColumn();
 $contasAutenticadas = $pdo->query("SELECT COUNT(*) FROM contas WHERE status IN ('autenticada', 'exportado')")->fetchColumn();
 
 // Novas estatísticas solicitadas pelo usuário
@@ -233,7 +234,7 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
         <?php endif; ?>
         
         <!-- Stats Cards -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             <div class="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
                 <div>
                     <p class="text-slate-500 text-sm font-semibold uppercase tracking-wider">Total de Contas</p>
@@ -250,6 +251,15 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
                 </div>
                 <div class="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-2xl flex items-center justify-center text-green-600 dark:text-green-400">
                     <i data-lucide="trending-up" class="w-6 h-6"></i>
+                </div>
+            </div>
+            <div class="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-slate-500 text-sm font-semibold uppercase tracking-wider">Autenticadas Hoje</p>
+                    <h3 class="text-3xl font-black mt-1"><?= $contasAutenticadasHoje ?></h3>
+                </div>
+                <div class="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-2xl flex items-center justify-center text-purple-600 dark:text-purple-400">
+                    <i data-lucide="shield" class="w-6 h-6"></i>
                 </div>
             </div>
             <div class="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
