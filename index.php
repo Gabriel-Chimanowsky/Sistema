@@ -371,17 +371,17 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
             <div class="overflow-x-auto custom-scrollbar">
                 <table class="w-full text-left border-collapse text-sm">
                     <thead>
-                        <tr class="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-slate-500 font-bold uppercase text-[11px] tracking-widest">
-                            <th class="p-4 w-12 text-center"><input type="checkbox" id="selectAll" class="w-4 h-4 rounded-md border-slate-300 dark:border-slate-600 focus:ring-blue-500"></th>
-                            <th class="p-4 w-16 text-center"><?= linkSort('id', 'ID', $sort, $dir) ?></th>
-                            <th class="p-4"><?= linkSort('username', 'Usuário', $sort, $dir) ?></th>
-                            <th class="p-4"><?= linkSort('nome', 'Nome', $sort, $dir) ?></th>
-                            <th class="p-4"><?= linkSort('email', 'E-mail', $sort, $dir) ?></th>
-                            <th class="p-4">Credenciais</th>
-                            <th class="p-4">2FA & Cookies</th>
-                            <th class="p-4 text-center"><?= linkSort('status', 'Status', $sort, $dir) ?></th>
-                            <th class="p-4">Dono</th>
-                            <th class="p-4 text-right pr-6">Ações</th>
+                        <tr class="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-slate-500 font-bold uppercase text-[10px] tracking-wider">
+                            <th class="px-2 py-3.5 w-10 text-center"><input type="checkbox" id="selectAll" class="w-4 h-4 rounded-md border-slate-300 dark:border-slate-600 focus:ring-blue-500"></th>
+                            <th class="px-2 py-3.5 w-14 text-center"><?= linkSort('id', 'ID', $sort, $dir) ?></th>
+                            <th class="px-2 py-3.5"><?= linkSort('username', 'Usuário', $sort, $dir) ?></th>
+                            <th class="px-2 py-3.5"><?= linkSort('nome', 'Nome', $sort, $dir) ?></th>
+                            <th class="px-2 py-3.5"><?= linkSort('email', 'E-mail', $sort, $dir) ?></th>
+                            <th class="px-2 py-3.5">Credenciais</th>
+                            <th class="px-2 py-3.5">2FA & Cookies</th>
+                            <th class="px-2 py-3.5 text-center"><?= linkSort('status', 'Status', $sort, $dir) ?></th>
+                            <th class="px-2 py-3.5">Dono</th>
+                            <th class="px-2 py-3.5 text-right pr-4">Ações</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
@@ -395,71 +395,71 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
                             }
                         ?>
                         <tr class="tr-hover group transition-colors <?= $conta['status'] === 'exportado' ? 'opacity-80 grayscale-[0.2]' : '' ?>" data-id="<?= $conta['id'] ?>" data-json='<?= json_encode($conta) ?>'>
-                            <td class="p-4 text-center"><input type="checkbox" class="check-conta w-4 h-4 rounded-md border-slate-300 dark:border-slate-600"></td>
-                            <td class="p-4 text-center font-bold text-slate-400">#<?= $conta['id'] ?></td>
-                            <td class="p-4">
+                            <td class="px-2 py-3 text-center"><input type="checkbox" class="check-conta w-4 h-4 rounded-md border-slate-300 dark:border-slate-600"></td>
+                            <td class="px-2 py-3 text-center font-bold text-slate-400">#<?= $conta['id'] ?></td>
+                            <td class="px-2 py-3">
                                 <div class="flex flex-col">
-                                    <span class="font-bold text-slate-800 dark:text-slate-200"><?= htmlspecialchars($conta['username']) ?></span>
-                                    <span class="text-xs text-slate-400"><?= htmlspecialchars($email_dominio) ?></span>
+                                    <span class="font-bold text-slate-800 dark:text-slate-200 max-w-[120px] truncate block" title="<?= htmlspecialchars($conta['username']) ?>"><?= htmlspecialchars($conta['username']) ?></span>
+                                    <span class="text-xs text-slate-400 max-w-[120px] truncate block" title="<?= htmlspecialchars($email_dominio) ?>"><?= htmlspecialchars($email_dominio) ?></span>
                                 </div>
                             </td>
-                            <td class="p-4">
+                            <td class="px-2 py-3">
                                 <div class="flex flex-col gap-1">
-                                    <div class="flex items-center gap-2 group/copy-nome">
-                                        <span class="font-medium"><?= htmlspecialchars($conta['nome']) ?></span>
-                                        <button onclick="copiar('<?= addslashes($conta['nome']) ?>', 'Nome copiado')" class="opacity-0 group-hover/copy-nome:opacity-100 transition"><i data-lucide="copy" class="w-3 h-3 text-slate-400 hover:text-blue-500"></i></button>
+                                    <div class="flex items-center gap-1.5 group/copy-nome">
+                                        <span class="font-medium max-w-[120px] truncate block" title="<?= htmlspecialchars($conta['nome']) ?>"><?= htmlspecialchars($conta['nome']) ?></span>
+                                        <button onclick="copiar('<?= addslashes($conta['nome']) ?>', 'Nome copiado')" class="opacity-0 group-hover/copy-nome:opacity-100 transition flex-shrink-0"><i data-lucide="copy" class="w-3 h-3 text-slate-400 hover:text-blue-500"></i></button>
                                     </div>
-                                    <div class="flex items-center gap-2 group/copy-sobrenome">
-                                        <span class="font-medium text-slate-500"><?= htmlspecialchars($conta['sobrenome']) ?></span>
-                                        <button onclick="copiar('<?= addslashes($conta['sobrenome']) ?>', 'Sobrenome copiado')" class="opacity-0 group-hover/copy-sobrenome:opacity-100 transition"><i data-lucide="copy" class="w-3 h-3 text-slate-400 hover:text-blue-500"></i></button>
+                                    <div class="flex items-center gap-1.5 group/copy-sobrenome">
+                                        <span class="font-medium text-slate-500 max-w-[120px] truncate block" title="<?= htmlspecialchars($conta['sobrenome']) ?>"><?= htmlspecialchars($conta['sobrenome']) ?></span>
+                                        <button onclick="copiar('<?= addslashes($conta['sobrenome']) ?>', 'Sobrenome copiado')" class="opacity-0 group-hover/copy-sobrenome:opacity-100 transition flex-shrink-0"><i data-lucide="copy" class="w-3 h-3 text-slate-400 hover:text-blue-500"></i></button>
                                     </div>
                                 </div>
                             </td>
-                            <td class="p-4">
-                                <div class="flex items-center gap-2 group/copy">
-                                    <span class="font-mono text-xs text-blue-600 dark:text-blue-400"><?= htmlspecialchars($conta['email']) ?></span>
-                                    <button onclick="copiar('<?= $conta['email'] ?>', 'E-mail copiado')" class="opacity-0 group-hover/copy:opacity-100 transition"><i data-lucide="copy" class="w-3 h-3 text-slate-400 hover:text-blue-500"></i></button>
+                            <td class="px-2 py-3">
+                                <div class="flex items-center gap-1.5 group/copy">
+                                    <span class="font-mono text-xs text-blue-600 dark:text-blue-400 truncate max-w-[130px] inline-block align-middle" title="<?= htmlspecialchars($conta['email']) ?>"><?= htmlspecialchars($conta['email']) ?></span>
+                                    <button onclick="copiar('<?= $conta['email'] ?>', 'E-mail copiado')" class="opacity-0 group-hover/copy:opacity-100 transition flex-shrink-0 align-middle"><i data-lucide="copy" class="w-3 h-3 text-slate-400 hover:text-blue-500"></i></button>
                                 </div>
                             </td>
-                            <td class="p-4">
+                            <td class="px-2 py-3">
                                 <div class="flex flex-col gap-1">
-                                    <div class="flex items-center gap-2 text-xs font-mono group/copy-senha">
-                                        <span class="text-slate-400 w-10">SEN:</span>
-                                        <span class="font-bold"><?= htmlspecialchars($conta['senha']) ?></span>
-                                        <button onclick="copiar('<?= addslashes($conta['senha']) ?>', 'Senha copiada')" class="opacity-0 group-hover/copy-senha:opacity-100 transition"><i data-lucide="copy" class="w-3 h-3 text-slate-400 hover:text-blue-500"></i></button>
+                                    <div class="flex items-center gap-1.5 text-xs font-mono group/copy-senha">
+                                        <span class="text-slate-400 w-8 flex-shrink-0">SEN:</span>
+                                        <span class="font-bold max-w-[90px] truncate block" title="<?= htmlspecialchars($conta['senha']) ?>"><?= htmlspecialchars($conta['senha']) ?></span>
+                                        <button onclick="copiar('<?= addslashes($conta['senha']) ?>', 'Senha copiada')" class="opacity-0 group-hover/copy-senha:opacity-100 transition flex-shrink-0"><i data-lucide="copy" class="w-3 h-3 text-slate-400 hover:text-blue-500"></i></button>
                                     </div>
                                 </div>
                             </td>
-                            <td class="p-4">
-                                <div class="flex flex-col gap-2">
+                            <td class="px-2 py-3">
+                                <div class="flex flex-col gap-1.5">
                                     <?php if ($conta['codigo_2fa']): ?>
-                                        <div class="flex items-center gap-2 text-[10px] font-mono bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg">
-                                            <span class="text-green-600 font-bold uppercase">2FA:</span>
-                                            <span class="truncate w-12">Salvo</span>
-                                            <button onclick="colar2FADireto(<?= $conta['id'] ?>)" class="text-slate-500 hover:text-blue-500 ml-auto" title="Editar 2FA"><i data-lucide="edit-3" class="w-3 h-3"></i></button>
-                                            <button onclick="copiar(JSON.parse(this.closest('tr').dataset.json).codigo_2fa, 'Código 2FA copiado')"><i data-lucide="copy" class="w-3 h-3"></i></button>
+                                        <div class="flex items-center gap-1.5 text-[10px] font-mono bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-lg max-w-[110px]">
+                                            <span class="text-green-600 font-bold uppercase flex-shrink-0">2FA:</span>
+                                            <span class="truncate w-8" title="Salvo">Salvo</span>
+                                            <button onclick="colar2FADireto(<?= $conta['id'] ?>)" class="text-slate-500 hover:text-blue-500 ml-auto flex-shrink-0" title="Editar 2FA"><i data-lucide="edit-3" class="w-3 h-3"></i></button>
+                                            <button onclick="copiar(JSON.parse(this.closest('tr').dataset.json).codigo_2fa, 'Código 2FA copiado')" class="flex-shrink-0"><i data-lucide="copy" class="w-3 h-3"></i></button>
                                         </div>
                                     <?php else: ?>
-                                        <button onclick="colar2FADireto(<?= $conta['id'] ?>)" class="text-[10px] font-bold text-blue-500 hover:underline">+ Colar 2FA</button>
+                                        <button onclick="colar2FADireto(<?= $conta['id'] ?>)" class="text-[10px] font-bold text-blue-500 hover:underline text-left">+ Colar 2FA</button>
                                     <?php endif; ?>
                                     
                                     <?php if ($conta['cookies']): ?>
-                                        <div class="flex items-center gap-2 text-[10px] font-mono bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg">
-                                            <span class="text-indigo-600 font-bold uppercase">CK:</span>
-                                            <span class="truncate w-12">Salvo</span>
-                                            <button onclick="colarCookiesDireto(<?= $conta['id'] ?>)" class="text-slate-500 hover:text-blue-500 ml-auto" title="Editar Cookies"><i data-lucide="edit-3" class="w-3 h-3"></i></button>
-                                            <button onclick="copiar(JSON.parse(this.closest('tr').dataset.json).cookies, 'Cookies copiados')"><i data-lucide="copy" class="w-3 h-3"></i></button>
+                                        <div class="flex items-center gap-1.5 text-[10px] font-mono bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-lg max-w-[110px]">
+                                            <span class="text-indigo-600 font-bold uppercase flex-shrink-0">CK:</span>
+                                            <span class="truncate w-8" title="Salvo">Salvo</span>
+                                            <button onclick="colarCookiesDireto(<?= $conta['id'] ?>)" class="text-slate-500 hover:text-blue-500 ml-auto flex-shrink-0" title="Editar Cookies"><i data-lucide="edit-3" class="w-3 h-3"></i></button>
+                                            <button onclick="copiar(JSON.parse(this.closest('tr').dataset.json).cookies, 'Cookies copiados')" class="flex-shrink-0"><i data-lucide="copy" class="w-3 h-3"></i></button>
                                         </div>
                                     <?php else: ?>
-                                        <button onclick="colarCookiesDireto(<?= $conta['id'] ?>)" class="text-[10px] font-bold text-slate-500 hover:underline">+ Colar Cookies</button>
+                                        <button onclick="colarCookiesDireto(<?= $conta['id'] ?>)" class="text-[10px] font-bold text-slate-500 hover:underline text-left">+ Colar Cookies</button>
                                     <?php endif; ?>
                                 </div>
                             </td>
-                            <td class="p-4 text-center">
+                            <td class="px-2 py-3 text-center">
                                 <form method="POST" action="processa.php">
                                     <input type="hidden" name="acao" value="mudar_status_direto">
                                     <input type="hidden" name="conta_id" value="<?= $conta['id'] ?>">
-                                    <select name="novo_status" onchange="this.form.submit()" class="text-[11px] font-black uppercase px-3 py-1.5 rounded-full border-2 cursor-pointer outline-none transition-all dark:bg-slate-900
+                                    <select name="novo_status" onchange="this.form.submit()" class="text-[10px] font-black uppercase px-2 py-1 rounded-full border cursor-pointer outline-none transition-all dark:bg-slate-900
                                         <?= $conta['status'] === 'pendente' ? 'bg-slate-100 text-slate-600 border-slate-200 dark:text-slate-400 dark:border-slate-700' : '' ?>
                                         <?= $conta['status'] === 'criada' ? 'bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800' : '' ?>
                                         <?= $conta['status'] === 'autenticada' ? 'bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-900/20 dark:border-emerald-800' : '' ?>
@@ -472,28 +472,28 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
                                 </form>
                                 
                                 <?php if ($conta['status'] === 'criada'): ?>
-                                    <div class="countdown-timer text-[10px] mt-2 font-black text-amber-600 animate-pulse" data-restante="<?= $restante ?>"></div>
+                                    <div class="countdown-timer text-[10px] mt-1.5 font-black text-amber-600 animate-pulse" data-restante="<?= $restante ?>"></div>
                                 <?php elseif (in_array($conta['status'], ['autenticada', 'exportado'])): ?>
                                     <div class="text-[10px] mt-1 font-bold text-emerald-600">Vida: <?= $dias_vida ?> <?= $dias_vida == 1 ? 'dia' : 'dias' ?></div>
                                     
                                     <!-- Bloco de BM e Página -->
-                                    <div class="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-1.5">
+                                    <div class="mt-1.5 pt-1.5 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-1">
                                         <!-- BM -->
-                                        <div class="flex items-center gap-2">
+                                        <div class="flex items-center justify-center gap-1">
                                             <?php if ($conta['bm_criada'] == 1): 
                                                 $dias_bm = 0;
                                                 if (!empty($conta['data_bm_criada'])) {
                                                     $dias_bm = floor((time() - strtotime($conta['data_bm_criada'])) / 86400);
                                                 }
                                             ?>
-                                                <div class="inline-flex items-center gap-1 text-[9px] font-black uppercase text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 pl-2 pr-1 py-0.5 rounded-lg">
-                                                    <i data-lucide="check-square" class="w-3 h-3"></i>
-                                                    BM Criada (<?= $dias_bm ?>d)
+                                                <div class="inline-flex items-center gap-1 text-[9px] font-black uppercase text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 pl-1.5 pr-0.5 py-0.5 rounded">
+                                                    <i data-lucide="check-square" class="w-2.5 h-2.5"></i>
+                                                    BM (<?= $dias_bm ?>d)
                                                     <form method="POST" action="processa.php" class="inline" onsubmit="event.preventDefault(); var f = this; showConfirmCard('Desfazer BM', 'Deseja desfazer a criação da BM desta conta?', 'Desfazer BM', 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/30', () => f.submit());">
                                                         <input type="hidden" name="acao" value="remover_bm">
                                                         <input type="hidden" name="conta_id" value="<?= $conta['id'] ?>">
                                                         <button type="submit" class="hover:bg-blue-200 dark:hover:bg-blue-800 p-0.5 rounded text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition" title="Desfazer BM">
-                                                            <i data-lucide="x" class="w-2.5 h-2.5"></i>
+                                                            <i data-lucide="x" class="w-2 h-2"></i>
                                                         </button>
                                                     </form>
                                                 </div>
@@ -502,35 +502,35 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
                                                     <form method="POST" action="processa.php" class="inline-block">
                                                         <input type="hidden" name="acao" value="criar_bm">
                                                         <input type="hidden" name="conta_id" value="<?= $conta['id'] ?>">
-                                                        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[9px] uppercase px-2 py-1 rounded-lg shadow-sm transition active:scale-95 flex items-center gap-1">
+                                                        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[9px] uppercase px-1.5 py-0.5 rounded shadow-sm transition active:scale-95 flex items-center gap-0.5">
                                                             <i data-lucide="plus-circle" class="w-2.5 h-2.5"></i>
                                                             Criar BM
                                                         </button>
                                                     </form>
                                                 <?php else: ?>
-                                                    <span class="inline-block text-[9px] font-bold text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800/40 px-1.5 py-0.5 rounded-lg" title="Aguardando maturação de 7 dias">
-                                                        BM: Maturando (falta <?= 7 - $dias_vida ?>d)
+                                                    <span class="inline-block text-[9px] font-bold text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800/40 px-1 py-0.5 rounded" title="Aguardando maturação de 7 dias">
+                                                        BM: Falta <?= 7 - $dias_vida ?>d
                                                     </span>
                                                 <?php endif; ?>
                                             <?php endif; ?>
                                         </div>
                                         
                                         <!-- Página -->
-                                        <div class="flex items-center gap-2">
+                                        <div class="flex items-center justify-center gap-1">
                                             <?php if (isset($conta['pagina_criada']) && $conta['pagina_criada'] == 1): 
                                                 $dias_pag = 0;
                                                 if (!empty($conta['data_pagina_criada'])) {
                                                     $dias_pag = floor((time() - strtotime($conta['data_pagina_criada'])) / 86400);
                                                 }
                                             ?>
-                                                <div class="inline-flex items-center gap-1 text-[9px] font-black uppercase text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 pl-2 pr-1 py-0.5 rounded-lg">
-                                                    <i data-lucide="check-square" class="w-3 h-3"></i>
-                                                    Página Criada (<?= $dias_pag ?>d)
+                                                <div class="inline-flex items-center gap-1 text-[9px] font-black uppercase text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 pl-1.5 pr-0.5 py-0.5 rounded">
+                                                    <i data-lucide="check-square" class="w-2.5 h-2.5"></i>
+                                                    Pág (<?= $dias_pag ?>d)
                                                     <form method="POST" action="processa.php" class="inline" onsubmit="event.preventDefault(); var f = this; showConfirmCard('Desfazer Página', 'Deseja desfazer a criação da Página desta conta?', 'Desfazer Página', 'bg-purple-600 hover:bg-purple-700 shadow-purple-600/30', () => f.submit());">
                                                         <input type="hidden" name="acao" value="remover_pagina">
                                                         <input type="hidden" name="conta_id" value="<?= $conta['id'] ?>">
                                                         <button type="submit" class="hover:bg-purple-200 dark:hover:bg-purple-800 p-0.5 rounded text-purple-500 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 transition" title="Desfazer Página">
-                                                            <i data-lucide="x" class="w-2.5 h-2.5"></i>
+                                                            <i data-lucide="x" class="w-2 h-2"></i>
                                                         </button>
                                                     </form>
                                                 </div>
@@ -539,30 +539,30 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
                                                     <form method="POST" action="processa.php" class="inline-block">
                                                         <input type="hidden" name="acao" value="criar_pagina">
                                                         <input type="hidden" name="conta_id" value="<?= $conta['id'] ?>">
-                                                        <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-[9px] uppercase px-2 py-1 rounded-lg shadow-sm transition active:scale-95 flex items-center gap-1">
+                                                        <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-[9px] uppercase px-1.5 py-0.5 rounded shadow-sm transition active:scale-95 flex items-center gap-0.5">
                                                             <i data-lucide="plus-circle" class="w-2.5 h-2.5"></i>
-                                                            Criar Página
+                                                            Criar Pág
                                                         </button>
                                                     </form>
                                                 <?php else: ?>
-                                                    <span class="inline-block text-[9px] font-bold text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800/40 px-1.5 py-0.5 rounded-lg" title="Aguardando maturação de 7 dias">
-                                                        Página: Maturando (falta <?= 7 - $dias_vida ?>d)
+                                                    <span class="inline-block text-[9px] font-bold text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800/40 px-1 py-0.5 rounded" title="Aguardando maturação de 7 dias">
+                                                        Pág: Falta <?= 7 - $dias_vida ?>d
                                                     </span>
                                                 <?php endif; ?>
                                             <?php endif; ?>
                                         </div>
-
+                                        
                                         <!-- Meta for Developers -->
-                                        <div class="flex items-center gap-2">
+                                        <div class="flex items-center justify-center gap-1">
                                             <?php if (isset($conta['dev_criada']) && $conta['dev_criada'] == 1): 
                                                 $dias_dev = 0;
                                                 if (!empty($conta['data_dev_criada'])) {
                                                     $dias_dev = floor((time() - strtotime($conta['data_dev_criada'])) / 86400);
                                                 }
                                             ?>
-                                                <div class="inline-flex items-center gap-1 text-[9px] font-black uppercase text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 pl-2 pr-1 py-0.5 rounded-lg">
-                                                    <i data-lucide="code-2" class="w-3 h-3"></i>
-                                                    Dev Criado (<?= $dias_dev ?>d)
+                                                <div class="inline-flex items-center gap-1 text-[9px] font-black uppercase text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 pl-1.5 pr-0.5 py-0.5 rounded">
+                                                    <i data-lucide="code-2" class="w-2.5 h-2.5"></i>
+                                                    Dev (<?= $dias_dev ?>d)
                                                     <form method="POST" action="processa.php" class="inline" onsubmit="event.preventDefault(); var f = this; showConfirmCard('Desfazer Dev', 'Deseja desfazer a criação do Meta for Developers desta conta?', 'Desfazer Dev', 'bg-orange-600 hover:bg-orange-700 shadow-orange-600/30', () => f.submit());">
                                                         <input type="hidden" name="acao" value="remover_dev">
                                                         <input type="hidden" name="conta_id" value="<?= $conta['id'] ?>">
@@ -576,14 +576,14 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
                                                     <form method="POST" action="processa.php" class="inline-block">
                                                         <input type="hidden" name="acao" value="criar_dev">
                                                         <input type="hidden" name="conta_id" value="<?= $conta['id'] ?>">
-                                                        <button type="submit" class="bg-orange-600 hover:bg-orange-700 text-white font-extrabold text-[9px] uppercase px-2 py-1 rounded-lg shadow-sm transition active:scale-95 flex items-center gap-1">
+                                                        <button type="submit" class="bg-orange-600 hover:bg-orange-700 text-white font-extrabold text-[9px] uppercase px-1.5 py-0.5 rounded shadow-sm transition active:scale-95 flex items-center gap-0.5">
                                                             <i data-lucide="plus-circle" class="w-2.5 h-2.5"></i>
                                                             Criar Dev
                                                         </button>
                                                     </form>
                                                 <?php else: ?>
-                                                    <span class="inline-block text-[9px] font-bold text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800/40 px-1.5 py-0.5 rounded-lg" title="Aguardando maturação de 7 dias">
-                                                        Dev: Maturando (falta <?= 7 - $dias_vida ?>d)
+                                                    <span class="inline-block text-[9px] font-bold text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800/40 px-1 py-0.5 rounded" title="Aguardando maturação de 7 dias">
+                                                        Dev: Falta <?= 7 - $dias_vida ?>d
                                                     </span>
                                                 <?php endif; ?>
                                             <?php endif; ?>
@@ -591,10 +591,10 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
                                     </div>
                                 <?php endif; ?>
                             </td>
-                            <td class="p-4">
+                            <td class="px-2 py-3">
                                 <form method="POST" action="processa.php">
                                     <input type="hidden" name="acao" value="vincular_pessoa"><input type="hidden" name="conta_id" value="<?= $conta['id'] ?>">
-                                    <select name="pessoa_id" onchange="this.form.submit()" class="bg-transparent dark:bg-slate-900 text-xs font-semibold outline-none border-b border-slate-200 dark:border-slate-700 cursor-pointer p-1 rounded">
+                                    <select name="pessoa_id" onchange="this.form.submit()" class="bg-transparent dark:bg-slate-900 text-xs font-semibold outline-none border-b border-slate-200 dark:border-slate-700 cursor-pointer p-1 rounded max-w-[100px]">
                                         <option value="">-- Livre --</option>
                                         <?php foreach ($pessoas as $p): ?>
                                             <option value="<?= $p['id'] ?>" <?= ($conta['destinada_a'] == $p['id']) ? 'selected' : '' ?>><?= htmlspecialchars($p['nome']) ?></option>
@@ -602,17 +602,15 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
                                     </select>
                                 </form>
                             </td>
-                            <td class="p-4 text-right pr-6">
-                                <div class="flex items-center justify-end gap-2">
-                                    <button onclick="copiarContaUnica(this)" class="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition" title="Copiar Perfil"><i data-lucide="clipboard-copy" class="w-4 h-4"></i></button>
-                                    <div class="w-px h-4 bg-slate-200 dark:border-slate-700"></div>
-                                    <button onclick="abrirNotaConta(<?= $conta['id'] ?>)" class="p-2 rounded-lg transition <?= !empty($conta['nota_conta']) ? 'text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20' : 'text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800' ?>" title="<?= !empty($conta['nota_conta']) ? htmlspecialchars($conta['nota_conta']) : 'Adicionar comentário' ?>"><i data-lucide="message-square<?= !empty($conta['nota_conta']) ? '' : '-plus' ?>" class="w-4 h-4"></i></button>
-                                    <button onclick="abrirModalEditarConta(<?= $conta['id'] ?>)" class="p-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition" title="Editar Conta"><i data-lucide="edit" class="w-4 h-4"></i></button>
-                                    <button onclick="abrirModal('Regerar dados desta conta?', this.closest('tr').querySelector('.form-regerar'))" class="p-2 text-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg transition"><i data-lucide="refresh-cw" class="w-4 h-4"></i></button>
-                                    <button onclick="abrirModal('Excluir conta permanentemente?', this.closest('tr').querySelector('.form-del'))" class="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                            <td class="px-2 py-3 text-right pr-4">
+                                <div class="flex items-center justify-end gap-1">
+                                    <button onclick="copiarContaUnica(this)" class="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition" title="Copiar Perfil"><i data-lucide="clipboard-copy" class="w-3.5 h-3.5"></i></button>
+                                    <div class="w-px h-3 bg-slate-200 dark:border-slate-700"></div>
+                                    <button onclick="abrirNotaConta(<?= $conta['id'] ?>)" class="p-1 rounded transition <?= !empty($conta['nota_conta']) ? 'text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20' : 'text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800' ?>" title="<?= !empty($conta['nota_conta']) ? htmlspecialchars($conta['nota_conta']) : 'Adicionar comentário' ?>"><i data-lucide="message-square<?= !empty($conta['nota_conta']) ? '' : '-plus' ?>" class="w-3.5 h-3.5"></i></button>
+                                    <button onclick="abrirModalEditarConta(<?= $conta['id'] ?>)" class="p-1 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition" title="Editar Conta"><i data-lucide="edit" class="w-3.5 h-3.5"></i></button>
+                                    <button onclick="abrirModal('Regerar dados desta conta?', this.closest('tr').querySelector('.form-regerar'))" class="p-1 text-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded transition"><i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i></button>
+                                    <button onclick="abrirModal('Excluir conta permanentemente?', this.closest('tr').querySelector('.form-del'))" class="p-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
                                     
-                                    <!-- Popover nota: renderizado globalmente, fora da tabela -->
-
                                     <form method="POST" action="processa.php" class="form-regerar hidden"><input type="hidden" name="acao" value="regerar_conta"><input type="hidden" name="conta_id" value="<?= $conta['id'] ?>"></form>
                                     <form method="POST" action="processa.php" class="form-del hidden"><input type="hidden" name="acao" value="del_conta"><input type="hidden" name="conta_id" value="<?= $conta['id'] ?>"></form>
                                 </div>
@@ -623,7 +621,7 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
                         <?php if ($conta['status'] !== 'autenticada' && $conta['status'] !== 'exportado'): ?>
                         <tr class="bg-slate-50/50 dark:bg-slate-800/20">
                             <td colspan="10" class="p-3 border-t border-dashed border-slate-200 dark:border-slate-800">
-                                <div class="flex flex-wrap items-center gap-6 px-12">
+                                <div class="flex flex-wrap items-center gap-6 px-4 md:px-8">
                                     <div class="flex items-center gap-3">
                                         <span class="text-[10px] font-black text-blue-500 uppercase tracking-widest bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded">SMS API</span>
                                         <select id="sms_servico_<?= $conta['id'] ?>" class="bg-white dark:bg-slate-800 text-xs font-bold p-1 rounded-lg border">
