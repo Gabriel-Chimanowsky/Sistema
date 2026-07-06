@@ -905,8 +905,20 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
 
     <script>
         lucide.createIcons();
-        if (window.location.search.includes('msg=ok')) {
-            setTimeout(() => mostrarToast('Ação realizada com sucesso!'), 300);
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.has('msg')) {
+            const msg = urlParams.get('msg');
+            if (msg === 'ok') {
+                setTimeout(() => mostrarToast('Ação realizada com sucesso!'), 300);
+            } else if (msg === 'erro_email_duplicado') {
+                setTimeout(() => mostrarToast('Erro: Este e-mail já está cadastrado em outra conta.', 'error'), 300);
+            }
+            
+            // Limpar o parâmetro msg da URL para evitar reapresentar o toast ao atualizar a página
+            urlParams.delete('msg');
+            const newSearch = urlParams.toString();
+            const newUrl = window.location.pathname + (newSearch ? '?' + newSearch : '') + window.location.hash;
+            window.history.replaceState({}, '', newUrl);
         }
 
         // ── Scroll Restore (Gerenciado Globalmente no common.js) ──────

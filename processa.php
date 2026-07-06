@@ -632,16 +632,35 @@ switch ($acao) {
         $codigo_2fa = trim($_POST['codigo_2fa'] ?? '');
         
         if ($id) {
+            // Verificar se o e-mail já está cadastrado em outra conta
+            if ($email !== '') {
+                $stmtCheck = $pdo->prepare("SELECT COUNT(*) FROM contas WHERE email = ? AND id != ?");
+                $stmtCheck->execute([$email, $id]);
+                if ($stmtCheck->fetchColumn() > 0) {
+                    header("Location: " . $voltar_para . (strpos($voltar_para, '?') !== false ? '&' : '?') . "msg=erro_email_duplicado");
+                    exit;
+                }
+            }
+
             $stmt = $pdo->prepare("SELECT status FROM contas WHERE id = ?");
             $stmt->execute([$id]);
             $statusAtual = $stmt->fetchColumn();
             
-            if ($codigo_2fa !== '' && $statusAtual !== 'exportado') {
-                $pdo->prepare("UPDATE contas SET nome = ?, sobrenome = ?, email = ?, username = ?, senha = ?, codigo_2fa = ?, status = 'autenticada', data_autenticacao = NOW() WHERE id = ?")
-                    ->execute([$nome, $sobrenome, $email, $username, $senha, $codigo_2fa, $id]);
-            } else {
-                $pdo->prepare("UPDATE contas SET nome = ?, sobrenome = ?, email = ?, username = ?, senha = ?, codigo_2fa = ? WHERE id = ?")
-                    ->execute([$nome, $sobrenome, $email, $username, $senha, $codigo_2fa, $id]);
+            try {
+                if ($codigo_2fa !== '' && $statusAtual !== 'exportado') {
+                    $pdo->prepare("UPDATE contas SET nome = ?, sobrenome = ?, email = ?, username = ?, senha = ?, codigo_2fa = ?, status = 'autenticada', data_autenticacao = NOW() WHERE id = ?")
+                        ->execute([$nome, $sobrenome, $email, $username, $senha, $codigo_2fa, $id]);
+                } else {
+                    $pdo->prepare("UPDATE contas SET nome = ?, sobrenome = ?, email = ?, username = ?, senha = ?, codigo_2fa = ? WHERE id = ?")
+                        ->execute([$nome, $sobrenome, $email, $username, $senha, $codigo_2fa, $id]);
+                }
+            } catch (PDOException $e) {
+                if ($e->getCode() == 23000 || strpos($e->getMessage(), '1062') !== false) {
+                    header("Location: " . $voltar_para . (strpos($voltar_para, '?') !== false ? '&' : '?') . "msg=erro_email_duplicado");
+                    exit;
+                } else {
+                    throw $e;
+                }
             }
         }
         break;

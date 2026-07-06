@@ -1,11 +1,26 @@
 // Funções globais para o Navbar e ações comuns
-function mostrarToast(msg) {
+function mostrarToast(msg, type = 'success') {
     const t = document.getElementById('toast');
     if (!t) return;
     const msgEl = document.getElementById('toastMsg');
     if (msgEl) msgEl.innerText = msg;
+
+    const iconContainer = t.querySelector('.rounded-full');
+    if (iconContainer) {
+        if (type === 'error') {
+            iconContainer.className = 'w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white shrink-0';
+            iconContainer.innerHTML = '<i data-lucide="x" class="w-4 h-4"></i>';
+        } else {
+            iconContainer.className = 'w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center text-white shrink-0';
+            iconContainer.innerHTML = '<i data-lucide="check" class="w-4 h-4"></i>';
+        }
+        if (window.lucide) {
+            window.lucide.createIcons();
+        }
+    }
+
     t.classList.remove('translate-y-32', 'opacity-0');
-    setTimeout(() => t.classList.add('translate-y-32', 'opacity-0'), 3000);
+    setTimeout(() => t.classList.add('translate-y-32', 'opacity-0'), 3500);
 }
 
 function showConfirmCard(title, text, confirmLabel, confirmColorClass, onConfirm) {
