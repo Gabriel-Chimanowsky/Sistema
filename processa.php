@@ -242,6 +242,14 @@ switch ($acao) {
                 $stmt = $pdo->prepare($sql);
                 $params = array_merge([$novo_status], $idsArray);
                 $stmt->execute($params);
+
+                // Registrar tentativas no log imutável
+                if ($novo_status === 'criada') {
+                    $stmtLog = $pdo->prepare("INSERT INTO log_criacao_contas (conta_id) VALUES (?)");
+                    foreach ($idsArray as $logId) {
+                        $stmtLog->execute([$logId]);
+                    }
+                }
             }
         }
         break;
@@ -304,6 +312,10 @@ switch ($acao) {
             elseif ($novo_status === 'exportado') $sql .= ", data_exportado = NOW()";
             $sql .= " WHERE id = ?";
             $pdo->prepare($sql)->execute([$novo_status, $id]);
+            // Registrar tentativa no log imutável
+            if ($novo_status === 'criada') {
+                $pdo->prepare("INSERT INTO log_criacao_contas (conta_id) VALUES (?)")->execute([$id]);
+            }
         }
         break;
 

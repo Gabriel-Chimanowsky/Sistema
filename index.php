@@ -18,6 +18,10 @@ $urlApi = 'https://hero-sms.com/stubs/handler_api.php';
 try { $pdo->query("SELECT data_autenticacao FROM contas LIMIT 1"); } catch (Exception $e) { $pdo->query("ALTER TABLE contas ADD COLUMN data_autenticacao DATETIME NULL"); }
 try { $pdo->query("SELECT cookies FROM contas LIMIT 1"); } catch (Exception $e) { $pdo->query("ALTER TABLE contas ADD COLUMN cookies LONGTEXT NULL"); }
 try { $pdo->query("SELECT nota_conta FROM contas LIMIT 1"); } catch (Exception $e) { $pdo->query("ALTER TABLE contas ADD COLUMN nota_conta TEXT DEFAULT NULL"); }
+// Log imutável de tentativas de criação (nunca decrementado por deleções ou reversões)
+try { $pdo->query("SELECT id FROM log_criacao_contas LIMIT 1"); } catch (Exception $e) {
+    $pdo->query("CREATE TABLE IF NOT EXISTS log_criacao_contas (id INT AUTO_INCREMENT PRIMARY KEY, conta_id INT NOT NULL, criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, INDEX idx_criado_em (criado_em)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+}
 
 // Processamento de ações AJAX/Post direto na index (legado mantido para compatibilidade, mas limpo)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao'])) {
@@ -66,6 +70,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao'])) {
         elseif ($novo_status === 'autenticada') $sql .= ", data_autenticacao = NOW()";
         $sql .= " WHERE id = ?";
         $pdo->prepare($sql)->execute([$novo_status, $conta_id]);
+        // Registrar tentativa no log imutável
+        if ($novo_status === 'criada' && $conta_id) {
+            $pdo->prepare("INSERT INTO log_criacao_contas (conta_id) VALUES (?)")->execute([$conta_id]);
+        }
         header("Location: index.php"); exit;
     }
 
@@ -88,8 +96,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao'])) {
 
 // Stats
 $totalContas = $pdo->query("SELECT COUNT(*) FROM contas")->fetchColumn();
-$contasCriadasHoje = $pdo->query("SELECT COUNT(*) FROM contas WHERE DATE(data_criacao) = CURDATE()")->fetchColumn();
-$contasAutenticadasHoje = $pdo->query("SELECT COUNT(*) FROM contas WHERE DATE(data_autenticacao) = CURDATE()")->fetchColumn();
+// Criadas — usa log imutável (tentativas, nunca diminui mesmo com deleções ou reversões)
+$contasCriadasSemana = $pdo->query("SELECT COUNT(*) FROM log_criacao_contas WHERE YEARWEEK(criado_em, 0) = YEARWEEK(NOW(), 0)")->fetchColumn();
+$contasCriadasHoje   = $pdo->query("SELECT COUNT(*) FROM log_criacao_contas WHERE DATE(criado_em) = CURDATE()")->fetchColumn();
+// Autenticadas — usa data_autenticacao (pode mudar se re-autenticar, ok)
+$contasAutenticadasSemana = $pdo->query("SELECT COUNT(*) FROM contas WHERE YEARWEEK(data_autenticacao, 0) = YEARWEEK(NOW(), 0)")->fetchColumn();
+$contasAutenticadasHoje   = $pdo->query("SELECT COUNT(*) FROM contas WHERE DATE(data_autenticacao) = CURDATE()")->fetchColumn();
 $contasAutenticadas = $pdo->query("SELECT COUNT(*) FROM contas WHERE status IN ('autenticada', 'exportado')")->fetchColumn();
 
 // Novas estatísticas solicitadas pelo usuário
@@ -209,13 +221,60 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
         }
         .tr-hover:hover { background-color: rgba(59, 130, 246, 0.02); }
         .dark .tr-hover:hover { background-color: rgba(59, 130, 246, 0.05); }
+
+        /* ---- Mobile safe-area ---- */
+        .footer-bar {
+            padding-bottom: calc(env(safe-area-inset-bottom) + 0.5rem);
+        }
+        /* Prevent iOS tap highlight */
+        button, a, select, input { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+        /* Prevent iOS zoom on inputs (needs font-size >= 16px) */
+        input, select, textarea { font-size: 16px; }
+        @media (min-width: 768px) {
+            input, select, textarea { font-size: unset; }
+        }
+
+        /* ---- Mobile card list (visible only on < md) ---- */
+        .mobile-card {
+            background: white;
+            border-radius: 1.25rem;
+            border: 1px solid #e2e8f0;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.625rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,.06);
+            transition: box-shadow 0.2s;
+        }
+        .mobile-card:active { box-shadow: 0 0 0 3px rgba(59,130,246,.15); }
+        @media (prefers-color-scheme: dark) {
+            .mobile-card { background: #0f172a; border-color: #1e293b; }
+        }
+        .mobile-card-header { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+        .mobile-card-body  { display: flex; flex-direction: column; gap: 0.375rem; }
+        .mobile-card-row   { display: flex; align-items: center; gap: 0.5rem; font-size: 0.75rem; }
+        .mobile-card-label { font-size: 0.65rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: #94a3b8; flex-shrink: 0; width: 2.5rem; }
+        .mobile-card-value { font-weight: 600; color: #334155; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+        @media (prefers-color-scheme: dark) { .mobile-card-value { color: #cbd5e1; } }
+        .mobile-card-footer { display: flex; align-items: center; gap: 0.5rem; border-top: 1px solid #f1f5f9; padding-top: 0.625rem; flex-wrap: wrap; }
+        @media (prefers-color-scheme: dark) { .mobile-card-footer { border-color: #1e293b; } }
+
+        /* hide desktop table on mobile, hide mobile cards on desktop */
+        @media (max-width: 767px) {
+            .desktop-table-wrap { display: none !important; }
+            .mobile-cards-wrap  { display: flex !important; }
+            main { padding-left: 0.75rem !important; padding-right: 0.75rem !important; }
+        }
+        @media (min-width: 768px) {
+            .mobile-cards-wrap  { display: none !important; }
+        }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 min-h-screen pb-24">
 
     <?php include 'navbar.php'; ?>
 
-    <main class="max-w-[1600px] mx-auto px-4 mt-24 space-y-6">
+    <main class="max-w-[1600px] mx-auto px-4 mt-20 md:mt-24 space-y-4 md:space-y-6">
         
         <!-- Alerta de Contas Falhadas (User) -->
         <?php if ($contasFalhadas > 0): ?>
@@ -234,7 +293,7 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
         <?php endif; ?>
         
         <!-- Stats Cards -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
             <div class="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
                 <div>
                     <p class="text-slate-500 text-sm font-semibold uppercase tracking-wider">Total de Contas</p>
@@ -246,8 +305,9 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
             </div>
             <div class="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
                 <div>
-                    <p class="text-slate-500 text-sm font-semibold uppercase tracking-wider">Criadas Hoje</p>
-                    <h3 class="text-3xl font-black mt-1"><?= $contasCriadasHoje ?></h3>
+                    <p class="text-slate-500 text-sm font-semibold uppercase tracking-wider">Criadas na Semana</p>
+                    <h3 class="text-3xl font-black mt-1"><?= $contasCriadasSemana ?></h3>
+                    <p class="text-xs text-slate-400 mt-1 font-medium"><span class="text-green-600 dark:text-green-400 font-bold"><?= $contasCriadasHoje ?></span> hoje</p>
                 </div>
                 <div class="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-2xl flex items-center justify-center text-green-600 dark:text-green-400">
                     <i data-lucide="trending-up" class="w-6 h-6"></i>
@@ -255,8 +315,9 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
             </div>
             <div class="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
                 <div>
-                    <p class="text-slate-500 text-sm font-semibold uppercase tracking-wider">Autenticadas Hoje</p>
-                    <h3 class="text-3xl font-black mt-1"><?= $contasAutenticadasHoje ?></h3>
+                    <p class="text-slate-500 text-sm font-semibold uppercase tracking-wider">Autenticadas na Semana</p>
+                    <h3 class="text-3xl font-black mt-1"><?= $contasAutenticadasSemana ?></h3>
+                    <p class="text-xs text-slate-400 mt-1 font-medium"><span class="text-purple-600 dark:text-purple-400 font-bold"><?= $contasAutenticadasHoje ?></span> hoje</p>
                 </div>
                 <div class="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-2xl flex items-center justify-center text-purple-600 dark:text-purple-400">
                     <i data-lucide="shield" class="w-6 h-6"></i>
@@ -282,7 +343,7 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
             </div>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
             <div class="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
                 <div>
                     <p class="text-slate-500 text-sm font-semibold uppercase tracking-wider">Uso por Pessoal</p>
@@ -366,6 +427,8 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
             </span>
         </div>
 
+        <!-- Desktop Table (hidden on mobile) -->
+        <div class="desktop-table-wrap">
         <!-- Table Container -->
         <div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl overflow-hidden">
             <div class="overflow-x-auto custom-scrollbar">
@@ -695,11 +758,118 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
                     </div>
                 </div>
             <?php endif; ?>
-        </div>
+        </div> <!-- /table-container -->
+        </div> <!-- /desktop-table-wrap -->
+
+        <!-- Mobile Cards (hidden on desktop) -->
+        <div class="mobile-cards-wrap flex-col gap-3">
+            <?php foreach ($contas as $conta):
+                $statusLabel = ['pendente'=>'Pendente','criada'=>'Criada','autenticada'=>'Autenticada','exportado'=>'Exportado'][$conta['status']] ?? $conta['status'];
+                $statusColor = [
+                    'pendente'    => 'bg-slate-100 text-slate-600',
+                    'criada'      => 'bg-amber-50 text-amber-600',
+                    'autenticada' => 'bg-emerald-50 text-emerald-600',
+                    'exportado'   => 'bg-purple-50 text-purple-600',
+                ][$conta['status']] ?? 'bg-slate-100 text-slate-600';
+            ?>
+            <div class="mobile-card" data-id="<?= $conta['id'] ?>" data-json='<?= json_encode($conta) ?>'>
+                <div class="mobile-card-header">
+                    <div class="flex items-center gap-2">
+                        <input type="checkbox" class="check-conta w-5 h-5 rounded-md border-slate-300 flex-shrink-0">
+                        <span class="text-xs font-black text-slate-400">#<?= $conta['id'] ?></span>
+                        <span class="font-bold text-sm text-slate-800 dark:text-slate-200 truncate max-w-[140px]"><?= htmlspecialchars($conta['nome']) ?> <?= htmlspecialchars($conta['sobrenome']) ?></span>
+                    </div>
+                    <span class="text-[10px] font-black uppercase px-2 py-0.5 rounded-full <?= $statusColor ?>"><?= $statusLabel ?></span>
+                </div>
+                <div class="mobile-card-body">
+                    <div class="mobile-card-row">
+                        <span class="mobile-card-label">User</span>
+                        <span class="mobile-card-value font-mono text-blue-600 dark:text-blue-400"><?= htmlspecialchars($conta['username']) ?></span>
+                        <button onclick="copiar('<?= addslashes($conta['username']) ?>', 'Usuário copiado')" class="flex-shrink-0 p-1"><i data-lucide="copy" class="w-3.5 h-3.5 text-slate-400"></i></button>
+                    </div>
+                    <div class="mobile-card-row">
+                        <span class="mobile-card-label">Email</span>
+                        <span class="mobile-card-value font-mono text-xs"><?= htmlspecialchars($conta['email']) ?></span>
+                        <button onclick="copiar('<?= addslashes($conta['email']) ?>', 'E-mail copiado')" class="flex-shrink-0 p-1"><i data-lucide="copy" class="w-3.5 h-3.5 text-slate-400"></i></button>
+                    </div>
+                    <div class="mobile-card-row">
+                        <span class="mobile-card-label">Senha</span>
+                        <span class="mobile-card-value font-mono"><?= htmlspecialchars($conta['senha']) ?></span>
+                        <button onclick="copiar('<?= addslashes($conta['senha']) ?>', 'Senha copiada')" class="flex-shrink-0 p-1"><i data-lucide="copy" class="w-3.5 h-3.5 text-slate-400"></i></button>
+                    </div>
+                    <?php if ($conta['codigo_2fa']): ?>
+                    <div class="mobile-card-row">
+                        <span class="mobile-card-label">2FA</span>
+                        <span class="mobile-card-value text-green-600 font-bold">Salvo</span>
+                        <button onclick="copiar(JSON.parse(this.closest('[data-id]').dataset.json).codigo_2fa, '2FA copiado')" class="flex-shrink-0 p-1"><i data-lucide="copy" class="w-3.5 h-3.5 text-slate-400"></i></button>
+                        <button onclick="colar2FADireto(<?= $conta['id'] ?>)" class="flex-shrink-0 p-1"><i data-lucide="edit-3" class="w-3.5 h-3.5 text-slate-400"></i></button>
+                    </div>
+                    <?php endif; ?>
+                    <?php if ($conta['destinada_a']): ?>
+                    <div class="mobile-card-row">
+                        <span class="mobile-card-label">Dono</span>
+                        <?php foreach ($pessoas as $p): if ($p['id'] == $conta['destinada_a']): ?>
+                        <span class="mobile-card-value"><?= htmlspecialchars($p['nome']) ?></span>
+                        <?php endif; endforeach; ?>
+                    </div>
+                    <?php endif; ?>
+                </div>
+                <div class="mobile-card-footer">
+                    <!-- Status select -->
+                    <form method="POST" action="processa.php" class="flex-1 min-w-0">
+                        <input type="hidden" name="acao" value="mudar_status_direto">
+                        <input type="hidden" name="conta_id" value="<?= $conta['id'] ?>">
+                        <select name="novo_status" onchange="this.form.submit()" class="w-full text-xs font-bold px-2 py-2 rounded-xl border cursor-pointer outline-none <?= $statusColor ?> dark:bg-slate-800">
+                            <option value="pendente" <?= $conta['status']==='pendente'?'selected':'' ?>>Pendente</option>
+                            <option value="criada"   <?= $conta['status']==='criada'?'selected':'' ?>>Criada</option>
+                            <option value="autenticada" <?= $conta['status']==='autenticada'?'selected':'' ?>>Autenticada</option>
+                            <option value="exportado" <?= $conta['status']==='exportado'?'selected':'' ?>>Exportado</option>
+                        </select>
+                    </form>
+                    <!-- Quick actions -->
+                    <button onclick="copiarContaUnica(this)" class="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition" title="Copiar dados">
+                        <i data-lucide="clipboard-copy" class="w-4 h-4 text-slate-500"></i>
+                    </button>
+                    <button onclick="abrirNotaConta(<?= $conta['id'] ?>)" class="p-2 rounded-xl transition <?= !empty($conta['nota_conta']) ? 'text-amber-500' : 'text-slate-400' ?>" title="Comentário">
+                        <i data-lucide="message-square<?= !empty($conta['nota_conta']) ? '' : '-plus' ?>" class="w-4 h-4"></i>
+                    </button>
+                    <button onclick="abrirModalEditarConta(<?= $conta['id'] ?>)" class="p-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition" title="Editar">
+                        <i data-lucide="edit" class="w-4 h-4"></i>
+                    </button>
+                    <button onclick="abrirModal('Excluir conta permanentemente?', this.closest('[data-id]').querySelector('.form-del-mobile'))" class="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition" title="Excluir">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    </button>
+                    <form method="POST" action="processa.php" class="form-del-mobile hidden">
+                        <input type="hidden" name="acao" value="del_conta">
+                        <input type="hidden" name="conta_id" value="<?= $conta['id'] ?>">
+                    </form>
+                </div>
+            </div>
+            <?php endforeach; ?>
+
+            <!-- Mobile Pagination -->
+            <?php if ($totalPages > 1): ?>
+            <div class="flex items-center justify-between gap-2 py-2 px-1">
+                <div class="text-xs text-slate-500 font-semibold">Pág <strong class="text-slate-800 dark:text-slate-200"><?= $page ?></strong> / <?= $totalPages ?></div>
+                <div class="flex items-center gap-1">
+                    <?php if ($page > 1): ?>
+                        <a href="<?= buildQuery(['page' => $page - 1]) ?>" class="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold flex items-center gap-1">
+                            <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                        </a>
+                    <?php endif; ?>
+                    <?php if ($page < $totalPages): ?>
+                        <a href="<?= buildQuery(['page' => $page + 1]) ?>" class="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold flex items-center gap-1">
+                            <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                        </a>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <?php endif; ?>
+        </div> <!-- /mobile-cards-wrap -->
     </main>
 
     <!-- Footer Action Bar -->
-    <div class="fixed bottom-0 left-0 w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 shadow-2xl z-40">
+    <div class="footer-bar fixed bottom-0 left-0 w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 shadow-2xl z-40">
         <div class="max-w-[1600px] mx-auto px-4">
 
             <div id="barraLote" class="hidden py-3 border-b border-slate-200 dark:border-slate-800">
@@ -773,24 +943,24 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
                 </div>
             </div>
 
-            <!-- Barra principal de geração -->
-            <div class="flex items-center justify-between gap-4 py-3">
-                <div class="flex items-center gap-3 text-slate-400 font-bold text-xs uppercase tracking-widest">
+            <!-- Barra principal de geracao -->
+            <div class="flex flex-wrap items-center justify-between gap-2 py-3">
+                <div class="hidden sm:flex items-center gap-3 text-slate-400 font-bold text-xs uppercase tracking-widest">
                     <i data-lucide="user-plus" class="w-5 h-5"></i>
                     Gerar Nova Conta
                 </div>
 
-                <form method="POST" action="processa.php" class="flex items-center gap-3">
+                <form method="POST" action="processa.php" class="flex flex-wrap items-center gap-2 flex-1">
                     <input type="hidden" name="acao" value="gerar_conta">
                     
                     <div class="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-1 gap-1">
-                        <select name="genero" id="genSelect" onchange="saveSettings()" class="bg-white dark:bg-slate-900 border-none rounded-lg px-3 py-1.5 text-xs font-bold outline-none cursor-pointer shadow-sm">
-                            <option value="homem">👨 Homem</option>
-                            <option value="mulher">👩 Mulher</option>
+                        <select name="genero" id="genSelect" onchange="saveSettings()" class="bg-white dark:bg-slate-900 border-none rounded-lg px-2 py-1.5 text-xs font-bold outline-none cursor-pointer shadow-sm">
+                            <option value="homem">Homem</option>
+                            <option value="mulher">Mulher</option>
                         </select>
-                        <select name="pais" id="paisSelect" onchange="saveSettings()" class="bg-white dark:bg-slate-900 border-none rounded-lg px-3 py-1.5 text-xs font-bold outline-none cursor-pointer shadow-sm">
-                            <option value="br">🇧🇷 Brasil</option>
-                            <option value="us">🇺🇸 EUA</option>
+                        <select name="pais" id="paisSelect" onchange="saveSettings()" class="bg-white dark:bg-slate-900 border-none rounded-lg px-2 py-1.5 text-xs font-bold outline-none cursor-pointer shadow-sm">
+                            <option value="br">BR</option>
+                            <option value="us">EUA</option>
                         </select>
                     </div>
 
@@ -799,8 +969,8 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
                         <input type="number" name="quantidade" value="1" min="1" max="200" class="bg-transparent w-10 text-sm font-bold outline-none text-center">
                     </div>
 
-                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-2 rounded-xl font-black text-sm shadow-xl shadow-blue-600/30 transition-all hover:scale-105 active:scale-95">
-                        GERAR AGORA
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-xl font-black text-sm shadow-xl shadow-blue-600/30 transition-all hover:scale-105 active:scale-95 flex-shrink-0">
+                        GERAR
                     </button>
                 </form>
 
@@ -1282,9 +1452,17 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
             });
         }, 1000);
 
-        document.getElementById('selectAll').addEventListener('change', (e) => {
-            document.querySelectorAll('.check-conta').forEach(c => c.checked = e.target.checked);
-            atualizarBarraLote();
+        // selectAll works for both desktop table and mobile cards
+        const selectAllEl = document.getElementById('selectAll');
+        if (selectAllEl) {
+            selectAllEl.addEventListener('change', (e) => {
+                document.querySelectorAll('.check-conta').forEach(c => c.checked = e.target.checked);
+                atualizarBarraLote();
+            });
+        }
+        // Mobile card checkboxes also trigger batch bar
+        document.querySelectorAll('.mobile-cards-wrap .check-conta').forEach(cb => {
+            cb.addEventListener('change', atualizarBarraLote);
         });
     </script>
 </body>
