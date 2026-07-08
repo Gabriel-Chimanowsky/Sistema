@@ -332,7 +332,7 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
                     <i data-lucide="shield-check" class="w-6 h-6"></i>
                 </div>
             </div>
-            <div class="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
+            <div class="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between col-span-2 lg:col-span-1">
                 <div>
                     <p class="text-slate-500 text-sm font-semibold uppercase tracking-wider">Pendente / Não Pronta</p>
                     <h3 class="text-3xl font-black mt-1"><?= $contasNaoProntas ?></h3>
