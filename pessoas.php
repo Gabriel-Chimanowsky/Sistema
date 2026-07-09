@@ -86,7 +86,7 @@ $pessoas = $stmtPessoas->fetchAll();
                                 <?php else: ?>
                                     <span class="text-sm text-slate-400 dark:text-slate-500 italic flex-1">Sem comentário</span>
                                 <?php endif; ?>
-                                <button type="button" onclick="abrirComentario(<?= $p['id'] ?>, <?= json_encode($p['comentario'] ?? '') ?>)"
+                                <button type="button" onclick="abrirComentario(<?= $p['id'] ?>, <?= htmlspecialchars(json_encode($p['comentario'] ?? ''), ENT_QUOTES) ?>)"
                                     class="shrink-0 p-1 text-slate-300 hover:text-blue-500 rounded-lg transition-all" title="Editar comentário">
                                     <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
                                 </button>
@@ -118,7 +118,7 @@ $pessoas = $stmtPessoas->fetchAll();
                                 <?php else: ?>
                                     <span class="text-sm text-slate-400 dark:text-slate-500 italic flex-1">Sem e-mail (Cloudflare)</span>
                                 <?php endif; ?>
-                                <button type="button" onclick="abrirEmail(<?= $p['id'] ?>, <?= json_encode($p['email'] ?? '') ?>)"
+                                <button type="button" onclick="abrirEmail(<?= $p['id'] ?>, <?= htmlspecialchars(json_encode($p['email'] ?? ''), ENT_QUOTES) ?>)"
                                     class="shrink-0 p-1 text-slate-300 hover:text-blue-500 rounded-lg transition-all" title="Editar e-mail">
                                     <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
                                 </button>
