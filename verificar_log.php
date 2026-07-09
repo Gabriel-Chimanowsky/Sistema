@@ -6,6 +6,18 @@ checkAuth();
 $logFile = __DIR__ . '/cloudflare_api_debug.log';
 $helperFile = __DIR__ . '/cloudflare_helper.php';
 $processaFile = __DIR__ . '/processa.php';
+
+// Processar limpeza de log antes de renderizar qualquer HTML
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['acao'] ?? '') === 'limpar_log') {
+    try {
+        $pdo->query("TRUNCATE TABLE cloudflare_api_logs");
+    } catch (Exception $e) {}
+    if (file_exists($logFile)) {
+        @unlink($logFile);
+    }
+    header("Location: verificar_log.php");
+    exit;
+}
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -41,19 +53,6 @@ $processaFile = __DIR__ . '/processa.php';
                 </form>
             </div>
         </div>
-
-        <?php
-        if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['acao'] ?? '') === 'limpar_log') {
-            try {
-                $pdo->query("TRUNCATE TABLE cloudflare_api_logs");
-            } catch (Exception $e) {}
-            if (file_exists($logFile)) {
-                @unlink($logFile);
-            }
-            header("Location: verificar_log.php");
-            exit;
-        }
-        ?>
 
         <!-- Diagnóstico Físico de Arquivos e Permissões -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
