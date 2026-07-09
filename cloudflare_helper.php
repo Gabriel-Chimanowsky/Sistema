@@ -170,16 +170,22 @@ if (!function_exists('sincronizarRedirecionamentoConta')) {
      * Cria, atualiza ou exclui a regra conforme a existência do dono e do e-mail de destino.
      */
     function sincronizarRedirecionamentoConta($contaId, $pdo) {
+        $logFile = __DIR__ . '/cloudflare_api_debug.log';
+        $logData = date('[Y-m-d H:i:s]') . " [START] sincronizarRedirecionamentoConta para Conta ID: {$contaId}\n";
+        
         // 1. Obter configurações do Cloudflare
         $stmtConf = $pdo->query("SELECT cloudflare_token, cloudflare_zone_id FROM configuracoes LIMIT 1");
         $config = $stmtConf->fetch();
         
-        if (empty($config['cloudflare_token']) || empty($config['cloudflare_zone_id'])) {
+        $token = $config['cloudflare_token'] ?? '';
+        $zoneId = $config['cloudflare_zone_id'] ?? '';
+        
+        $logData .= "Credenciais - Token: " . (!empty($token) ? 'definido' : 'VAZIO') . " | Zone ID: " . (!empty($zoneId) ? 'definido' : 'VAZIO') . "\n";
+        @file_put_contents($logFile, $logData, FILE_APPEND);
+        
+        if (empty($token) || empty($zoneId)) {
             return; // Cloudflare não está configurado
         }
-        
-        $token = $config['cloudflare_token'];
-        $zoneId = $config['cloudflare_zone_id'];
         
         // 2. Obter informações da conta
         $stmtConta = $pdo->prepare("SELECT email, destinada_a FROM contas WHERE id = ?");
@@ -280,15 +286,21 @@ if (!function_exists('sincronizarRedirecionamentosPessoa')) {
      * Otimizado para fazer apenas uma chamada de listagem de regras no Cloudflare.
      */
     function sincronizarRedirecionamentosPessoa($pessoaId, $pdo) {
+        $logFile = __DIR__ . '/cloudflare_api_debug.log';
+        $logData = date('[Y-m-d H:i:s]') . " [START] sincronizarRedirecionamentosPessoa para Pessoa ID: {$pessoaId}\n";
+        
         $stmtConf = $pdo->query("SELECT cloudflare_token, cloudflare_zone_id FROM configuracoes LIMIT 1");
         $config = $stmtConf->fetch();
         
-        if (empty($config['cloudflare_token']) || empty($config['cloudflare_zone_id'])) {
+        $token = $config['cloudflare_token'] ?? '';
+        $zoneId = $config['cloudflare_zone_id'] ?? '';
+        
+        $logData .= "Credenciais - Token: " . (!empty($token) ? 'definido' : 'VAZIO') . " | Zone ID: " . (!empty($zoneId) ? 'definido' : 'VAZIO') . "\n";
+        @file_put_contents($logFile, $logData, FILE_APPEND);
+        
+        if (empty($token) || empty($zoneId)) {
             return;
         }
-        
-        $token = $config['cloudflare_token'];
-        $zoneId = $config['cloudflare_zone_id'];
         
         $regras = buscarTodasRegras($token, $zoneId);
         $regrasPorEmail = indexarRegrasPorEmail($regras);
