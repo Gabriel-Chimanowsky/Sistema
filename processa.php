@@ -495,7 +495,21 @@ switch ($acao) {
         $nome = trim($_POST['nome_pessoa'] ?? '');
         $email = trim($_POST['email_pessoa'] ?? '') ?: null;
         if ($nome) {
-            $pdo->prepare("INSERT INTO pessoas (nome, email) VALUES (?, ?)")->execute([$nome, $email]);
+            try {
+                $pdo->prepare("INSERT INTO pessoas (nome, email) VALUES (?, ?)")->execute([$nome, $email]);
+            } catch (PDOException $e) {
+                // Se a coluna 'email' não existir, tenta criá-la e refaz o insert
+                if ($e->getCode() == '42S22' || strpos($e->getMessage(), '1054') !== false) {
+                    try {
+                        $pdo->query("ALTER TABLE pessoas ADD COLUMN email VARCHAR(255) NULL DEFAULT NULL");
+                        $pdo->prepare("INSERT INTO pessoas (nome, email) VALUES (?, ?)")->execute([$nome, $email]);
+                    } catch (Exception $e2) {
+                        die("Erro ao adicionar cliente e criar coluna: " . $e2->getMessage());
+                    }
+                } else {
+                    die("Erro ao adicionar cliente: " . $e->getMessage());
+                }
+            }
         }
         break;
 
@@ -522,9 +536,27 @@ switch ($acao) {
         $id = filter_input(INPUT_POST, 'pessoa_id', FILTER_VALIDATE_INT);
         $email = trim($_POST['email'] ?? '') ?: null;
         if ($id) {
-            $pdo->prepare("UPDATE pessoas SET email = ? WHERE id = ?")->execute([$email, $id]);
-            require_once 'cloudflare_helper.php';
-            sincronizarRedirecionamentosPessoa($id, $pdo);
+            try {
+                $pdo->prepare("UPDATE pessoas SET email = ? WHERE id = ?")->execute([$email, $id]);
+            } catch (PDOException $e) {
+                // Se a coluna 'email' não existir, tenta criá-la e refaz o update
+                if ($e->getCode() == '42S22' || strpos($e->getMessage(), '1054') !== false) {
+                    try {
+                        $pdo->query("ALTER TABLE pessoas ADD COLUMN email VARCHAR(255) NULL DEFAULT NULL");
+                        $pdo->prepare("UPDATE pessoas SET email = ? WHERE id = ?")->execute([$email, $id]);
+                    } catch (Exception $e2) {
+                        die("Erro ao atualizar e-mail e criar coluna: " . $e2->getMessage());
+                    }
+                } else {
+                    die("Erro ao atualizar e-mail: " . $e->getMessage());
+                }
+            }
+            try {
+                require_once 'cloudflare_helper.php';
+                sincronizarRedirecionamentosPessoa($id, $pdo);
+            } catch (Exception $e) {
+                // Sincronização de regras falhou ou Cloudflare indisponível, mas salvou o e-mail localmente.
+            }
         }
         break;
 
