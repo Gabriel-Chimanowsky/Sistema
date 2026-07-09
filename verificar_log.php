@@ -7,16 +7,30 @@ $logFile = __DIR__ . '/cloudflare_api_debug.log';
 $helperFile = __DIR__ . '/cloudflare_helper.php';
 $processaFile = __DIR__ . '/processa.php';
 
-// Processar limpeza de log antes de renderizar qualquer HTML
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['acao'] ?? '') === 'limpar_log') {
-    try {
-        $pdo->query("TRUNCATE TABLE cloudflare_api_logs");
-    } catch (Exception $e) {}
-    if (file_exists($logFile)) {
-        @unlink($logFile);
+$mensagemAcao = '';
+
+// Processar ações antes de renderizar qualquer HTML
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $acao = $_POST['acao'] ?? '';
+    if ($acao === 'limpar_log') {
+        try {
+            $pdo->query("TRUNCATE TABLE cloudflare_api_logs");
+        } catch (Exception $e) {}
+        if (file_exists($logFile)) {
+            @unlink($logFile);
+        }
+        header("Location: verificar_log.php");
+        exit;
     }
-    header("Location: verificar_log.php");
-    exit;
+    
+    if ($acao === 'forcar_sync_slack') {
+        try {
+            sincronizarSlackTracker($pdo);
+            $mensagemAcao = "✓ Sincronização do Slack disparada com sucesso!";
+        } catch (Exception $e) {
+            $mensagemAcao = "Error: " . $e->getMessage();
+        }
+    }
 }
 ?>
 <!DOCTYPE html>
@@ -42,6 +56,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['acao'] ?? '') === 'limpar_
                 <p class="text-xs text-slate-400 mt-1">Status em tempo real das alterações do Cloudflare e Slack.</p>
             </div>
             <div class="flex gap-2">
+                <form method="POST" class="inline">
+                    <input type="hidden" name="acao" value="forcar_sync_slack">
+                    <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition">
+                        💬 Forçar Sync Slack
+                    </button>
+                </form>
                 <button onclick="window.location.reload()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition">
                     🔄 Atualizar Diagnóstico
                 </button>
@@ -53,6 +73,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['acao'] ?? '') === 'limpar_
                 </form>
             </div>
         </div>
+
+        <?php if (!empty($mensagemAcao)): ?>
+            <div class="bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 p-4 rounded-xl text-xs font-bold">
+                <?php echo htmlspecialchars($mensagemAcao); ?>
+            </div>
+        <?php endif; ?>
 
         <!-- Diagnóstico de Domínios e IDs no Banco -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
