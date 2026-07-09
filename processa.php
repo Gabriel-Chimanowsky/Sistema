@@ -425,7 +425,7 @@ switch ($acao) {
                     }
                     
                     $contador = (int)$config['email_contador'];
-                    $novoId = (300 * $k) + $contador;
+                    $novoId = (200 * $k) + $contador;
 
                     $sql = "INSERT INTO contas (id, nome, sobrenome, username, email, senha, genero, pais, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pendente')";
                     $pdo->prepare($sql)->execute([$novoId, $dados['nome'], $dados['sobrenome'], $dados['username'], $email, $config['senha_padrao'], $genero, $pais]);

@@ -56,7 +56,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['confirmar'] ?? '') === 'si
             }
             
             $k = $domainIndices[$domain] ?? 0;
-            $newId = (300 * $k) + $number;
+            $newId = (200 * $k) + $number;
             
             if ($oldId !== $newId) {
                 $updates[] = [
@@ -156,8 +156,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['confirmar'] ?? '') === 'si
                     <p>Este utilitário fará a reorganização dos IDs da tabela <code>contas</code> com as seguintes regras:</p>
                     <ul class="list-disc pl-4 space-y-1">
                         <li>Domínio 1 (<strong>dollfinn.com</strong>): IDs de 1 a 200 (corresponde a contatoX)</li>
-                        <li>Domínio 2 (<strong>whitebeavers.com</strong>): IDs de 301 a 500 (corresponde a contatoX + 300)</li>
-                        <li>Domínio 3 (<strong>novos domínios</strong>): IDs de 601 a 800 (corresponde a contatoX + 600)</li>
+                        <li>Domínio 2 (<strong>whitebeavers.com</strong>): IDs de 201 a 400 (corresponde a contatoX + 200)</li>
+                        <li>Domínio 3 (<strong>novos domínios</strong>): IDs de 401 a 600 (corresponde a contatoX + 400)</li>
                     </ul>
                     <p class="mt-2">Todos os registros associados nas tabelas de logs serão mantidos com os IDs corretos. A operação é segura e possui tratamento contra colisões de chaves.</p>
                 </div>
