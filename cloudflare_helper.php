@@ -65,7 +65,7 @@ if (!function_exists('cfApiCall')) {
             $logData .= "Response: " . substr($response, 0, 500) . "\n";
         }
         $logData .= "--------------------------------------------------\n";
-        registrarCfLog($logData, $pdo);
+        registrarCfLog($logData);
         // ------------------------------------------
         
         if ($curlError) {
