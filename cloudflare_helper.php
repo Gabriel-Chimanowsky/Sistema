@@ -14,6 +14,7 @@ if (!function_exists('cfApiCall')) {
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, 20);
         curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // Fail-safe contra erros de certificado SSL local/servidor
         
         $headers = [
             'Authorization: Bearer ' . $token,
@@ -29,6 +30,22 @@ if (!function_exists('cfApiCall')) {
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $curlError = curl_error($ch);
         curl_close($ch);
+        
+        // --- LOG DE DEBUG DA API DO CLOUDFLARE ---
+        $logFile = __DIR__ . '/cloudflare_api_debug.log';
+        $logData = date('[Y-m-d H:i:s]') . " {$method} {$url}\n";
+        if ($body !== null) {
+            $logData .= "Request Body: " . json_encode($body) . "\n";
+        }
+        $logData .= "HTTP Code: {$httpCode}\n";
+        if ($curlError) {
+            $logData .= "cURL Error: {$curlError}\n";
+        } else {
+            $logData .= "Response: " . substr($response, 0, 500) . "\n";
+        }
+        $logData .= "--------------------------------------------------\n";
+        @file_put_contents($logFile, $logData, FILE_APPEND);
+        // ------------------------------------------
         
         if ($curlError) {
             return ['success' => false, 'errors' => [['message' => 'cURL error: ' . $curlError]]];
