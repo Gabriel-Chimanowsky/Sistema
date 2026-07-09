@@ -185,6 +185,38 @@ if (!function_exists('excluirRegraCloudflare')) {
     }
 }
 
+if (!function_exists('obterZoneIdPorDominio')) {
+    /**
+     * Obtém o Zone ID do Cloudflare para um domínio específico de forma dinâmica.
+     */
+    function obterZoneIdPorDominio($token, $domain) {
+        $url = "https://api.cloudflare.com/client/v4/zones?name=" . urlencode($domain);
+        $data = cfApiCall($token, $url, 'GET');
+        if ($data && isset($data['success']) && $data['success'] && !empty($data['result'])) {
+            return $data['result'][0]['id'];
+        }
+        return null;
+    }
+}
+
+if (!function_exists('obterZoneIdParaEmail')) {
+    /**
+     * Extrai o domínio de um e-mail e resolve seu Zone ID do Cloudflare (com cache local).
+     */
+    function obterZoneIdParaEmail($token, $email, $defaultZoneId, &$zoneCache) {
+        $parts = explode('@', $email);
+        $domain = isset($parts[1]) ? strtolower(trim($parts[1])) : '';
+        if (empty($domain)) {
+            return $defaultZoneId;
+        }
+        if (!isset($zoneCache[$domain])) {
+            $resolved = obterZoneIdPorDominio($token, $domain);
+            $zoneCache[$domain] = $resolved ?: $defaultZoneId;
+        }
+        return $zoneCache[$domain];
+    }
+}
+
 if (!function_exists('sincronizarRedirecionamentoConta')) {
     /**
      * Sincroniza o redirecionamento de e-mail de uma conta específica no Cloudflare.
@@ -198,12 +230,11 @@ if (!function_exists('sincronizarRedirecionamentoConta')) {
         $config = $stmtConf->fetch();
         
         $token = $config['cloudflare_token'] ?? '';
-        $zoneId = $config['cloudflare_zone_id'] ?? '';
+        $defaultZoneId = $config['cloudflare_zone_id'] ?? '';
         
-        $logData .= "Credenciais - Token: " . (!empty($token) ? 'definido' : 'VAZIO') . " | Zone ID: " . (!empty($zoneId) ? 'definido' : 'VAZIO') . "\n";
-        registrarCfLog($logData, $pdo);
-        
-        if (empty($token) || empty($zoneId)) {
+        if (empty($token) || empty($defaultZoneId)) {
+            $logData .= "Erro: Credenciais de Cloudflare vazias.\n";
+            registrarCfLog($logData);
             return; // Cloudflare não está configurado
         }
         
@@ -218,6 +249,13 @@ if (!function_exists('sincronizarRedirecionamentoConta')) {
         
         $aliasEmail = $conta['email'];
         $pessoaId = $conta['destinada_a'];
+        
+        // Obter Zone ID Dinâmico
+        $zoneCache = [];
+        $zoneId = obterZoneIdParaEmail($token, $aliasEmail, $defaultZoneId, $zoneCache);
+        
+        $logData .= "Conta: {$aliasEmail} | Zone ID Resolvido: {$zoneId} (Padrão: {$defaultZoneId})\n";
+        registrarCfLog($logData);
         
         $destEmail = null;
         if ($pessoaId) {
@@ -303,7 +341,7 @@ if (!function_exists('indexarRegrasPorEmail')) {
 if (!function_exists('sincronizarRedirecionamentosPessoa')) {
     /**
      * Sincroniza os redirecionamentos de todas as contas associadas a uma pessoa.
-     * Otimizado para fazer apenas uma chamada de listagem de regras no Cloudflare.
+     * Otimizado para agrupar por domínio/Zone ID dinâmico e fazer listagens únicas.
      */
     function sincronizarRedirecionamentosPessoa($pessoaId, $pdo) {
         $logData = date('[Y-m-d H:i:s]') . " [START] sincronizarRedirecionamentosPessoa para Pessoa ID: {$pessoaId}\n";
@@ -312,42 +350,55 @@ if (!function_exists('sincronizarRedirecionamentosPessoa')) {
         $config = $stmtConf->fetch();
         
         $token = $config['cloudflare_token'] ?? '';
-        $zoneId = $config['cloudflare_zone_id'] ?? '';
+        $defaultZoneId = $config['cloudflare_zone_id'] ?? '';
         
-        $logData .= "Credenciais - Token: " . (!empty($token) ? 'definido' : 'VAZIO') . " | Zone ID: " . (!empty($zoneId) ? 'definido' : 'VAZIO') . "\n";
+        $logData .= "Credenciais - Token: " . (!empty($token) ? 'definido' : 'VAZIO') . " | Zone ID Padrão: " . (!empty($defaultZoneId) ? 'definido' : 'VAZIO') . "\n";
         registrarCfLog($logData, $pdo);
         
-        if (empty($token) || empty($zoneId)) {
+        if (empty($token) || empty($defaultZoneId)) {
             return;
         }
         
-        $regras = buscarTodasRegras($token, $zoneId);
-        $regrasPorEmail = indexarRegrasPorEmail($regras);
-        
+        // Buscar todas as contas da pessoa
         $stmtContas = $pdo->prepare("SELECT id, email FROM contas WHERE destinada_a = ?");
         $stmtContas->execute([$pessoaId]);
         $contas = $stmtContas->fetchAll();
         
+        // Obter o email da pessoa
         $stmtPessoa = $pdo->prepare("SELECT email FROM pessoas WHERE id = ?");
         $stmtPessoa->execute([$pessoaId]);
         $destEmail = $stmtPessoa->fetchColumn() ?: null;
         
+        // Agrupar as contas por Zone ID dinâmico
+        $contasPorZone = [];
+        $zoneCache = [];
         foreach ($contas as $c) {
-            $aliasEmail = $c['email'];
-            $regraExistente = $regrasPorEmail[strtolower(trim($aliasEmail))] ?? null;
+            $zoneId = obterZoneIdParaEmail($token, $c['email'], $defaultZoneId, $zoneCache);
+            $contasPorZone[$zoneId][] = $c;
+        }
+        
+        // Sincronizar para cada Zone ID separadamente
+        foreach ($contasPorZone as $zoneId => $contasDaZone) {
+            $regras = buscarTodasRegras($token, $zoneId);
+            $regrasPorEmail = indexarRegrasPorEmail($regras);
             
-            if (!empty($destEmail)) {
-                if ($regraExistente) {
-                    $destAtual = $regraExistente['actions'][0]['value'][0] ?? '';
-                    if (strtolower(trim($destAtual)) !== strtolower(trim($destEmail)) || !$regraExistente['enabled']) {
-                        atualizarRegraCloudflare($token, $zoneId, $regraExistente['id'], $aliasEmail, $destEmail);
+            foreach ($contasDaZone as $c) {
+                $aliasEmail = $c['email'];
+                $regraExistente = $regrasPorEmail[strtolower(trim($aliasEmail))] ?? null;
+                
+                if (!empty($destEmail)) {
+                    if ($regraExistente) {
+                        $destAtual = $regraExistente['actions'][0]['value'][0] ?? '';
+                        if (strtolower(trim($destAtual)) !== strtolower(trim($destEmail)) || !$regraExistente['enabled']) {
+                            atualizarRegraCloudflare($token, $zoneId, $regraExistente['id'], $aliasEmail, $destEmail);
+                        }
+                    } else {
+                        criarRegraCloudflare($token, $zoneId, $aliasEmail, $destEmail);
                     }
                 } else {
-                    criarRegraCloudflare($token, $zoneId, $aliasEmail, $destEmail);
-                }
-            } else {
-                if ($regraExistente) {
-                    excluirRegraCloudflare($token, $zoneId, $regraExistente['id']);
+                    if ($regraExistente) {
+                        excluirRegraCloudflare($token, $zoneId, $regraExistente['id']);
+                    }
                 }
             }
         }
@@ -357,7 +408,7 @@ if (!function_exists('sincronizarRedirecionamentosPessoa')) {
 if (!function_exists('sincronizarRedirecionamentoContasMassa')) {
     /**
      * Sincroniza redirecionamentos para múltiplos IDs de contas de uma única vez.
-     * Otimizado para fazer apenas uma chamada de listagem de regras no Cloudflare.
+     * Otimizado para agrupar por domínio/Zone ID dinâmico e fazer listagens únicas.
      */
     function sincronizarRedirecionamentoContasMassa($idsArray, $pdo) {
         $stmtConf = $pdo->query("SELECT cloudflare_token, cloudflare_zone_id FROM configuracoes LIMIT 1");
@@ -368,11 +419,11 @@ if (!function_exists('sincronizarRedirecionamentoContasMassa')) {
         }
         
         $token = $config['cloudflare_token'];
-        $zoneId = $config['cloudflare_zone_id'];
+        $defaultZoneId = $config['cloudflare_zone_id'];
         
-        $regras = buscarTodasRegras($token, $zoneId);
-        $regrasPorEmail = indexarRegrasPorEmail($regras);
-        
+        // Agrupar as contas por Zone ID dinâmico
+        $contasPorZone = [];
+        $zoneCache = [];
         foreach ($idsArray as $contaId) {
             $stmtConta = $pdo->prepare("SELECT email, destinada_a FROM contas WHERE id = ?");
             $stmtConta->execute([$contaId]);
@@ -380,30 +431,41 @@ if (!function_exists('sincronizarRedirecionamentoContasMassa')) {
             
             if (!$conta) continue;
             
-            $aliasEmail = $conta['email'];
-            $pessoaId = $conta['destinada_a'];
+            $zoneId = obterZoneIdParaEmail($token, $conta['email'], $defaultZoneId, $zoneCache);
+            $contasPorZone[$zoneId][] = $conta;
+        }
+        
+        // Sincronizar para cada Zone ID separadamente
+        foreach ($contasPorZone as $zoneId => $contasDaZone) {
+            $regras = buscarTodasRegras($token, $zoneId);
+            $regrasPorEmail = indexarRegrasPorEmail($regras);
             
-            $destEmail = null;
-            if ($pessoaId) {
-                $stmtPessoa = $pdo->prepare("SELECT email FROM pessoas WHERE id = ?");
-                $stmtPessoa->execute([$pessoaId]);
-                $destEmail = $stmtPessoa->fetchColumn() ?: null;
-            }
-            
-            $regraExistente = $regrasPorEmail[strtolower(trim($aliasEmail))] ?? null;
-            
-            if (!empty($destEmail)) {
-                if ($regraExistente) {
-                    $destAtual = $regraExistente['actions'][0]['value'][0] ?? '';
-                    if (strtolower(trim($destAtual)) !== strtolower(trim($destEmail)) || !$regraExistente['enabled']) {
-                        atualizarRegraCloudflare($token, $zoneId, $regraExistente['id'], $aliasEmail, $destEmail);
+            foreach ($contasDaZone as $conta) {
+                $aliasEmail = $conta['email'];
+                $pessoaId = $conta['destinada_a'];
+                
+                $destEmail = null;
+                if ($pessoaId) {
+                    $stmtPessoa = $pdo->prepare("SELECT email FROM pessoas WHERE id = ?");
+                    $stmtPessoa->execute([$pessoaId]);
+                    $destEmail = $stmtPessoa->fetchColumn() ?: null;
+                }
+                
+                $regraExistente = $regrasPorEmail[strtolower(trim($aliasEmail))] ?? null;
+                
+                if (!empty($destEmail)) {
+                    if ($regraExistente) {
+                        $destAtual = $regraExistente['actions'][0]['value'][0] ?? '';
+                        if (strtolower(trim($destAtual)) !== strtolower(trim($destEmail)) || !$regraExistente['enabled']) {
+                            atualizarRegraCloudflare($token, $zoneId, $regraExistente['id'], $aliasEmail, $destEmail);
+                        }
+                    } else {
+                        criarRegraCloudflare($token, $zoneId, $aliasEmail, $destEmail);
                     }
                 } else {
-                    criarRegraCloudflare($token, $zoneId, $aliasEmail, $destEmail);
-                }
-            } else {
-                if ($regraExistente) {
-                    excluirRegraCloudflare($token, $zoneId, $regraExistente['id']);
+                    if ($regraExistente) {
+                        excluirRegraCloudflare($token, $zoneId, $regraExistente['id']);
+                    }
                 }
             }
         }
@@ -423,7 +485,7 @@ if (!function_exists('removerRedirecionamentoConta')) {
         }
         
         $token = $config['cloudflare_token'];
-        $zoneId = $config['cloudflare_zone_id'];
+        $defaultZoneId = $config['cloudflare_zone_id'];
         
         $stmtConta = $pdo->prepare("SELECT email FROM contas WHERE id = ?");
         $stmtConta->execute([$contaId]);
@@ -432,6 +494,9 @@ if (!function_exists('removerRedirecionamentoConta')) {
         if (!$email) {
             return;
         }
+        
+        $zoneCache = [];
+        $zoneId = obterZoneIdParaEmail($token, $email, $defaultZoneId, $zoneCache);
         
         $regraExistente = buscarRegraPorEmail($token, $zoneId, $email);
         if ($regraExistente) {
@@ -443,7 +508,7 @@ if (!function_exists('removerRedirecionamentoConta')) {
 if (!function_exists('removerRedirecionamentoContasMassa')) {
     /**
      * Exclui redirecionamentos de múltiplas contas de uma só vez.
-     * Otimizado para fazer apenas uma chamada de listagem de regras no Cloudflare.
+     * Otimizado para agrupar por domínio/Zone ID dinâmico e fazer listagens únicas.
      */
     function removerRedirecionamentoContasMassa($idsArray, $pdo) {
         $stmtConf = $pdo->query("SELECT cloudflare_token, cloudflare_zone_id FROM configuracoes LIMIT 1");
@@ -454,11 +519,11 @@ if (!function_exists('removerRedirecionamentoContasMassa')) {
         }
         
         $token = $config['cloudflare_token'];
-        $zoneId = $config['cloudflare_zone_id'];
+        $defaultZoneId = $config['cloudflare_zone_id'];
         
-        $regras = buscarTodasRegras($token, $zoneId);
-        $regrasPorEmail = indexarRegrasPorEmail($regras);
-        
+        // Agrupar e-mails por Zone ID dinâmico
+        $emailsPorZone = [];
+        $zoneCache = [];
         foreach ($idsArray as $contaId) {
             $stmtConta = $pdo->prepare("SELECT email FROM contas WHERE id = ?");
             $stmtConta->execute([$contaId]);
@@ -466,9 +531,20 @@ if (!function_exists('removerRedirecionamentoContasMassa')) {
             
             if (!$email) continue;
             
-            $regraExistente = $regrasPorEmail[strtolower(trim($email))] ?? null;
-            if ($regraExistente) {
-                excluirRegraCloudflare($token, $zoneId, $regraExistente['id']);
+            $zoneId = obterZoneIdParaEmail($token, $email, $defaultZoneId, $zoneCache);
+            $emailsPorZone[$zoneId][] = $email;
+        }
+        
+        // Sincronizar exclusão para cada Zone ID separadamente
+        foreach ($emailsPorZone as $zoneId => $emailsDaZone) {
+            $regras = buscarTodasRegras($token, $zoneId);
+            $regrasPorEmail = indexarRegrasPorEmail($regras);
+            
+            foreach ($emailsDaZone as $email) {
+                $regraExistente = $regrasPorEmail[strtolower(trim($email))] ?? null;
+                if ($regraExistente) {
+                    excluirRegraCloudflare($token, $zoneId, $regraExistente['id']);
+                }
             }
         }
     }
