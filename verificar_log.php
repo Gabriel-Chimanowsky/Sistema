@@ -26,7 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['acao'] ?? '') === 'limpar_
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cloudflare API Diagnostics</title>
     <script src="tailwind.js?v=1"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;855&family=Fira+Code&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Fira+Code&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; }
         pre { font-family: 'Fira Code', monospace; }
@@ -144,6 +144,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['acao'] ?? '') === 'limpar_
                 </div>
             </div>
 
+        </div>
+
+        <!-- Dump da API de Regras do Cloudflare (Diagnóstico de Paginação) -->
+        <div class="bg-slate-800/40 border border-slate-800 p-6 rounded-2xl space-y-4">
+            <h2 class="text-sm font-bold text-white uppercase tracking-wider text-slate-400">⚡ Teste de Resposta da API (Paginador do Cloudflare)</h2>
+            <div class="text-xs space-y-2">
+                <?php
+                try {
+                    $stmtConf = $pdo->query("SELECT cloudflare_token, cloudflare_zone_id FROM configuracoes LIMIT 1");
+                    $config = $stmtConf->fetch();
+                    $token = $config['cloudflare_token'] ?? '';
+                    $zone = $config['cloudflare_zone_id'] ?? '';
+                    
+                    if (!empty($token) && !empty($zone)) {
+                        require_once 'cloudflare_helper.php';
+                        $url = "https://api.cloudflare.com/client/v4/zones/{$zone}/email/routing/rules?page=1&per_page=50";
+                        $data = cfApiCall($token, $url, 'GET');
+                        
+                        echo "<p><strong class='text-slate-400'>Chaves da resposta raiz:</strong> " . implode(', ', array_keys($data)) . "</p>";
+                        if (isset($data['result_info'])) {
+                            echo "<p class='text-emerald-400 font-bold'>result_info encontrado:</p>";
+                            echo "<pre class='bg-slate-950 p-3 rounded-lg text-emerald-400 font-mono mt-1'>" . print_r($data['result_info'], true) . "</pre>";
+                        } else {
+                            echo "<p class='text-red-500 font-bold'>AVISO: 'result_info' está FALTANDO na resposta da API do Cloudflare!</p>";
+                        }
+                    } else {
+                        echo "<p class='text-amber-500'>Credenciais em branco no banco.</p>";
+                    }
+                } catch (Exception $e) {
+                    echo "<p class='text-red-500'>Erro: " . $e->getMessage() . "</p>";
+                }
+                ?>
+            </div>
         </div>
 
         <!-- Logs da API -->
