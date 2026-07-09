@@ -161,13 +161,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['acao'] ?? '') === 'limpar_
                         require_once 'cloudflare_helper.php';
                         $url = "https://api.cloudflare.com/client/v4/zones/{$zone}/email/routing/rules?page=1&per_page=50";
                         $data = cfApiCall($token, $url, 'GET');
-                        
-                        echo "<p><strong class='text-slate-400'>Chaves da resposta raiz:</strong> " . implode(', ', array_keys($data)) . "</p>";
                         if (isset($data['result_info'])) {
-                            echo "<p class='text-emerald-400 font-bold'>result_info encontrado:</p>";
-                            echo "<pre class='bg-slate-950 p-3 rounded-lg text-emerald-400 font-mono mt-1'>" . print_r($data['result_info'], true) . "</pre>";
+                            $info = $data['result_info'];
+                            $total = $info['total_count'] ?? 0;
+                            $pages = $info['per_page'] > 0 ? ceil($total / $info['per_page']) : 1;
+                            echo "<p class='text-emerald-400 font-bold'>✓ Conexão com a API do Cloudflare realizada com sucesso!</p>";
+                            echo "<p class='text-slate-300 mt-1'>Total de regras no Cloudflare: <strong class='text-white'>{$total}</strong> (distribuídas em <strong class='text-white'>{$pages}</strong> páginas de paginação).</p>";
                         } else {
-                            echo "<p class='text-red-500 font-bold'>AVISO: 'result_info' está FALTANDO na resposta da API do Cloudflare!</p>";
+                            echo "<p class='text-red-500 font-bold'>AVISO: Informações de paginação não retornadas pelo Cloudflare.</p>";
                         }
                     } else {
                         echo "<p class='text-amber-500'>Credenciais em branco no banco.</p>";
