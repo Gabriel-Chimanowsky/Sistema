@@ -310,7 +310,15 @@ if (!function_exists('buscarTodasRegras')) {
             }
             
             $info = $data['result_info'] ?? null;
-            if (!$info || $page >= ($info['total_pages'] ?? 1)) {
+            if (!$info) {
+                break;
+            }
+            
+            $totalCount = $info['total_count'] ?? 0;
+            $perPageLimit = $info['per_page'] ?? 50;
+            $totalPages = $perPageLimit > 0 ? ceil($totalCount / $perPageLimit) : 1;
+            
+            if ($page >= $totalPages) {
                 break;
             }
             $page++;
