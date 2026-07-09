@@ -24,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['acao'] ?? '') === 'limpar_
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cloudflare API Diagnostics</title>
+    <title>Cloudflare API Diagnostics & Inspector</title>
     <script src="tailwind.js?v=1"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Fira+Code&display=swap" rel="stylesheet">
     <style>
@@ -54,124 +54,76 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['acao'] ?? '') === 'limpar_
             </div>
         </div>
 
-        <!-- Diagnóstico Físico de Arquivos e Permissões -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            
-            <div class="bg-slate-800/40 border border-slate-800 p-6 rounded-2xl space-y-4">
-                <h2 class="text-sm font-bold text-white uppercase tracking-wider text-slate-400">📁 Status dos Arquivos (Git Pull)</h2>
-                <div class="space-y-2 text-xs">
-                    <div class="flex justify-between">
-                        <span class="text-slate-400">cloudflare_helper.php:</span>
-                        <span class="font-mono text-slate-200">
-                            <?php 
-                            if (file_exists($helperFile)) {
-                                echo "Presente (Modificado em: " . date("d/m/Y H:i:s", filemtime($helperFile)) . ")";
+        <!-- Diagnóstico de Domínios e IDs no Banco -->
+        <div class="bg-slate-800/40 border border-slate-800 p-6 rounded-2xl space-y-4">
+            <h2 class="text-sm font-bold text-white uppercase tracking-wider text-slate-400">📊 Distribuição Atual de Contas por Domínio</h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs border-collapse">
+                    <thead>
+                        <tr class="border-b border-slate-700 text-slate-400">
+                            <th class="py-2">Domínio</th>
+                            <th class="py-2">Qtd Contas</th>
+                            <th class="py-2">ID Mínimo</th>
+                            <th class="py-2">ID Máximo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php
+                        try {
+                            $stmt = $pdo->query("
+                                SELECT 
+                                    LOWER(SUBSTRING_INDEX(email, '@', -1)) as dominio,
+                                    COUNT(*) as total,
+                                    MIN(id) as min_id,
+                                    MAX(id) as max_id
+                                FROM contas 
+                                GROUP BY dominio
+                                ORDER BY min_id ASC
+                            ");
+                            $rows = $stmt->fetchAll();
+                            if (empty($rows)) {
+                                echo "<tr><td colspan='4' class='py-4 text-center text-slate-500'>Nenhuma conta cadastrada no banco.</td></tr>";
                             } else {
-                                echo "<span class='text-red-500 font-bold'>NÃO ENCONTRADO</span>";
-                            }
-                            ?>
-                        </span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-slate-400">processa.php:</span>
-                        <span class="font-mono text-slate-200">
-                            <?php 
-                            if (file_exists($processaFile)) {
-                                echo "Presente (Modificado em: " . date("d/m/Y H:i:s", filemtime($processaFile)) . ")";
-                            } else {
-                                echo "<span class='text-red-500 font-bold'>NÃO ENCONTRADO</span>";
-                            }
-                            ?>
-                        </span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-slate-400">Pasta Raiz Gravável:</span>
-                        <span class="font-mono">
-                            <?php 
-                            if (is_writable(__DIR__)) {
-                                echo "<span class='text-emerald-400 font-bold'>SIM (Gravação de Logs ok)</span>";
-                            } else {
-                                echo "<span class='text-red-500 font-bold'>NÃO (Erro de permissão para criar logs)</span>";
-                            }
-                            ?>
-                        </span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="bg-slate-800/40 border border-slate-800 p-6 rounded-2xl space-y-4">
-                <h2 class="text-sm font-bold text-white uppercase tracking-wider text-slate-400">💾 Status do Banco de Dados</h2>
-                <div class="space-y-2 text-xs">
-                    <div class="flex justify-between">
-                        <span class="text-slate-400">Coluna 'email' em 'pessoas':</span>
-                        <span class="font-mono">
-                            <?php 
-                            try {
-                                $stmt = $pdo->query("SHOW COLUMNS FROM pessoas");
-                                $colunas = array_column($stmt->fetchAll(), 'Field');
-                                if (in_array('email', $colunas)) {
-                                    echo "<span class='text-emerald-400 font-bold'>SIM (Criada com sucesso)</span>";
-                                } else {
-                                    echo "<span class='text-red-500 font-bold'>NÃO (Erro na migração)</span>";
+                                foreach ($rows as $row) {
+                                    echo "<tr class='border-b border-slate-850 hover:bg-slate-800/20'>";
+                                    echo "<td class='py-2.5 font-semibold text-white'>" . htmlspecialchars($row['dominio']) . "</td>";
+                                    echo "<td class='py-2.5 text-slate-300'>" . $row['total'] . "</td>";
+                                    echo "<td class='py-2.5 font-mono text-slate-450'>" . $row['min_id'] . "</td>";
+                                    echo "<td class='py-2.5 font-mono text-slate-450'>" . $row['max_id'] . "</td>";
+                                    echo "</tr>";
                                 }
-                            } catch (Exception $e) {
-                                echo "<span class='text-red-500 font-bold'>Erro ao verificar: " . $e->getMessage() . "</span>";
                             }
-                            ?>
-                        </span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-slate-400">Configuração Cloudflare:</span>
-                        <span class="font-mono">
-                            <?php 
-                            try {
-                                $stmtConf = $pdo->query("SELECT cloudflare_token, cloudflare_zone_id FROM configuracoes LIMIT 1");
-                                $config = $stmtConf->fetch();
-                                $token = $config['cloudflare_token'] ?? '';
-                                $zone = $config['cloudflare_zone_id'] ?? '';
-                                
-                                if (!empty($token) && !empty($zone)) {
-                                    echo "<span class='text-emerald-400 font-bold'>Configurado (Token e Zone presentes)</span>";
-                                } else {
-                                    echo "<span class='text-amber-500 font-bold'>INCOMPLETO (Verifique token ou zone_id em branco)</span>";
-                                }
-                            } catch (Exception $e) {
-                                echo "<span class='text-red-500 font-bold'>Erro: " . $e->getMessage() . "</span>";
-                            }
-                            ?>
-                        </span>
-                    </div>
-                </div>
+                        } catch (Exception $e) {
+                            echo "<tr><td colspan='4' class='py-4 text-red-500'>Erro: " . $e->getMessage() . "</td></tr>";
+                        }
+                        ?>
+                    </tbody>
+                </table>
             </div>
-
         </div>
 
-        <!-- Dump da API de Regras do Cloudflare (Diagnóstico de Paginação) -->
+        <!-- Amostra de Contas -->
         <div class="bg-slate-800/40 border border-slate-800 p-6 rounded-2xl space-y-4">
-            <h2 class="text-sm font-bold text-white uppercase tracking-wider text-slate-400">⚡ Teste de Resposta da API (Paginador do Cloudflare)</h2>
-            <div class="text-xs space-y-2">
+            <h2 class="text-sm font-bold text-white uppercase tracking-wider text-slate-400">🔍 Amostra das primeiras 10 Contas de cada Domínio</h2>
+            <div class="text-xs space-y-4">
                 <?php
                 try {
-                    $stmtConf = $pdo->query("SELECT cloudflare_token, cloudflare_zone_id FROM configuracoes LIMIT 1");
-                    $config = $stmtConf->fetch();
-                    $token = $config['cloudflare_token'] ?? '';
-                    $zone = $config['cloudflare_zone_id'] ?? '';
+                    $stmtDominios = $pdo->query("SELECT DISTINCT LOWER(SUBSTRING_INDEX(email, '@', -1)) as dom FROM contas");
+                    $doms = array_column($stmtDominios->fetchAll(), 'dom');
                     
-                    if (!empty($token) && !empty($zone)) {
-                        require_once 'cloudflare_helper.php';
-                        $url = "https://api.cloudflare.com/client/v4/zones/{$zone}/email/routing/rules?page=1&per_page=50";
-                        $data = cfApiCall($token, $url, 'GET');
-                        if (isset($data['result_info'])) {
-                            $info = $data['result_info'];
-                            $total = $info['total_count'] ?? 0;
-                            $pages = $info['per_page'] > 0 ? ceil($total / $info['per_page']) : 1;
-                            echo "<p class='text-emerald-400 font-bold'>✓ Conexão com a API do Cloudflare realizada com sucesso!</p>";
-                            echo "<p class='text-slate-300 mt-1'>Total de regras no Cloudflare: <strong class='text-white'>{$total}</strong> (distribuídas em <strong class='text-white'>{$pages}</strong> páginas de paginação).</p>";
-                        } else {
-                            echo "<p class='text-red-500 font-bold'>AVISO: Informações de paginação não retornadas pelo Cloudflare.</p>";
+                    foreach ($doms as $d) {
+                        echo "<div class='space-y-1'>";
+                        echo "<h3 class='font-bold text-sky-400'>" . htmlspecialchars($d) . "</h3>";
+                        $stmtSample = $pdo->prepare("SELECT id, email FROM contas WHERE email LIKE ? ORDER BY id ASC LIMIT 10");
+                        $stmtSample->execute(['%@' . $d]);
+                        $samples = $stmtSample->fetchAll();
+                        
+                        echo "<div class='grid grid-cols-2 md:grid-cols-5 gap-2 font-mono text-[10px] text-slate-300 bg-slate-950 p-3 rounded-xl border border-slate-850'>";
+                        foreach ($samples as $s) {
+                            echo "<div>ID " . $s['id'] . ": " . htmlspecialchars(explode('@', $s['email'])[0]) . "</div>";
                         }
-                    } else {
-                        echo "<p class='text-amber-500'>Credenciais em branco no banco.</p>";
+                        echo "</div>";
+                        echo "</div>";
                     }
                 } catch (Exception $e) {
                     echo "<p class='text-red-500'>Erro: " . $e->getMessage() . "</p>";
@@ -184,7 +136,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['acao'] ?? '') === 'limpar_
         <div class="space-y-2">
             <h2 class="text-sm font-bold text-white uppercase tracking-wider text-slate-400">📜 Histórico de Comunicação (Logs da API)</h2>
             <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800 shadow-2xl">
-                <pre class="text-xs text-emerald-400 overflow-x-auto h-[400px] overflow-y-auto whitespace-pre-wrap leading-relaxed"><?php
+                <pre class="text-xs text-emerald-400 overflow-x-auto h-[300px] overflow-y-auto whitespace-pre-wrap leading-relaxed"><?php
                     $logs = [];
                     try {
                         $stmtLogs = $pdo->query("SELECT texto FROM cloudflare_api_logs ORDER BY id DESC LIMIT 100");
