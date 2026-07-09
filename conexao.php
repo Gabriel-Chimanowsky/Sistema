@@ -124,9 +124,18 @@ try {
             `list_id` varchar(50) NOT NULL,
             `week` varchar(100) NOT NULL,
             `type` varchar(20) NOT NULL,
+            `domain` varchar(50) DEFAULT NULL,
             `criado_em` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (`id`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        // Garantir coluna domain na tabela slack_lotes_count
+        $stmtLotesCols = $pdo->query("SHOW COLUMNS FROM slack_lotes_count");
+        $colunasLotes = array_column($stmtLotesCols->fetchAll(), 'Field');
+        if (!in_array('domain', $colunasLotes)) {
+            $pdo->query("ALTER TABLE slack_lotes_count ADD COLUMN domain VARCHAR(50) NULL DEFAULT NULL");
+        }
+        $pdo->query("UPDATE slack_lotes_count SET domain = 'dollfinn' WHERE domain IS NULL");
 
         // 5. Tabela apps
         $pdo->query("CREATE TABLE IF NOT EXISTS `apps` (
@@ -476,9 +485,9 @@ if (!function_exists('sincronizarSlackTracker')) {
             $totalUnsynced = count($contasUnsynced);
 
             if ($totalUnsynced >= 50) {
-                // Obter count via Banco de Dados ao invés da API do Slack (para evitar delay de cache)
-                $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM slack_lotes_count WHERE list_id = ? AND week = ? AND type = 'perfil'");
-                $stmtCount->execute([$list_id, $week_title]);
+                // Obter count acumulado de lotes para este domínio (independente de semana ou lista)
+                $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM slack_lotes_count WHERE domain = ? AND type = 'perfil'");
+                $stmtCount->execute([$nomeDominio]);
                 $loteCount = (int) $stmtCount->fetchColumn();
 
                 $startRange = ($loteCount * 50) + 1;
@@ -516,7 +525,7 @@ if (!function_exists('sincronizarSlackTracker')) {
 
                 if ($subRes && isset($subRes['ok']) && $subRes['ok']) {
                     // Registra que um novo lote foi criado
-                    $pdo->prepare("INSERT INTO slack_lotes_count (list_id, week, type) VALUES (?, ?, ?)")->execute([$list_id, $week_title, 'perfil']);
+                    $pdo->prepare("INSERT INTO slack_lotes_count (list_id, week, type, domain) VALUES (?, ?, ?, ?)")->execute([$list_id, $week_title, 'perfil', $nomeDominio]);
 
                     $idsToUpdate = array_slice(array_column($contasUnsynced, 'id'), 0, 50);
                     $in = str_repeat('?,', count($idsToUpdate) - 1) . '?';
@@ -529,9 +538,9 @@ if (!function_exists('sincronizarSlackTracker')) {
             $totalBmsUnsynced = count($bmsUnsynced);
 
             if ($totalBmsUnsynced >= 50) {
-                // Obter count via Banco de Dados ao invés da API do Slack (para evitar delay de cache)
-                $stmtCountBm = $pdo->prepare("SELECT COUNT(*) FROM slack_lotes_count WHERE list_id = ? AND week = ? AND type = 'bm'");
-                $stmtCountBm->execute([$list_id, $week_title]);
+                // Obter count acumulado de lotes para este domínio (independente de semana ou lista)
+                $stmtCountBm = $pdo->prepare("SELECT COUNT(*) FROM slack_lotes_count WHERE domain = ? AND type = 'bm'");
+                $stmtCountBm->execute([$nomeDominio]);
                 $loteCountBm = (int) $stmtCountBm->fetchColumn();
 
                 $startRangeBm = ($loteCountBm * 50) + 1;
@@ -569,7 +578,7 @@ if (!function_exists('sincronizarSlackTracker')) {
 
                 if ($subRes && isset($subRes['ok']) && $subRes['ok']) {
                     // Registra que um novo lote foi criado
-                    $pdo->prepare("INSERT INTO slack_lotes_count (list_id, week, type) VALUES (?, ?, ?)")->execute([$list_id, $week_title, 'bm']);
+                    $pdo->prepare("INSERT INTO slack_lotes_count (list_id, week, type, domain) VALUES (?, ?, ?, ?)")->execute([$list_id, $week_title, 'bm', $nomeDominio]);
 
                     $idsToUpdate = array_slice(array_column($bmsUnsynced, 'id'), 0, 50);
                     $in = str_repeat('?,', count($idsToUpdate) - 1) . '?';
