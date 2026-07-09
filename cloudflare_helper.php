@@ -207,17 +207,157 @@ if (!function_exists('sincronizarRedirecionamentoConta')) {
     }
 }
 
+if (!function_exists('buscarTodasRegras')) {
+    /**
+     * Busca todas as regras de redirecionamento de e-mail no Cloudflare de uma só vez (paginado).
+     */
+    function buscarTodasRegras($token, $zoneId) {
+        $rules = [];
+        $page = 1;
+        $perPage = 50;
+        
+        while (true) {
+            $url = "https://api.cloudflare.com/client/v4/zones/{$zoneId}/email/routing/rules?page={$page}&per_page={$perPage}";
+            $data = cfApiCall($token, $url, 'GET');
+            
+            if (!$data || !isset($data['success']) || !$data['success']) {
+                break;
+            }
+            
+            foreach ($data['result'] as $rule) {
+                $rules[] = $rule;
+            }
+            
+            $info = $data['result_info'] ?? null;
+            if (!$info || $page >= ($info['total_pages'] ?? 1)) {
+                break;
+            }
+            $page++;
+        }
+        
+        return $rules;
+    }
+}
+
+if (!function_exists('indexarRegrasPorEmail')) {
+    /**
+     * Indexa as regras do Cloudflare em um array associativo chaveado pelo e-mail do alias (lowercase).
+     */
+    function indexarRegrasPorEmail($rules) {
+        $indexed = [];
+        foreach ($rules as $rule) {
+            foreach ($rule['matchers'] as $matcher) {
+                if (isset($matcher['field']) && $matcher['field'] === 'to' && isset($matcher['value'])) {
+                    $emailLower = strtolower(trim($matcher['value']));
+                    $indexed[$emailLower] = $rule;
+                }
+            }
+        }
+        return $indexed;
+    }
+}
+
 if (!function_exists('sincronizarRedirecionamentosPessoa')) {
     /**
      * Sincroniza os redirecionamentos de todas as contas associadas a uma pessoa.
+     * Otimizado para fazer apenas uma chamada de listagem de regras no Cloudflare.
      */
     function sincronizarRedirecionamentosPessoa($pessoaId, $pdo) {
-        $stmtContas = $pdo->prepare("SELECT id FROM contas WHERE destinada_a = ?");
+        $stmtConf = $pdo->query("SELECT cloudflare_token, cloudflare_zone_id FROM configuracoes LIMIT 1");
+        $config = $stmtConf->fetch();
+        
+        if (empty($config['cloudflare_token']) || empty($config['cloudflare_zone_id'])) {
+            return;
+        }
+        
+        $token = $config['cloudflare_token'];
+        $zoneId = $config['cloudflare_zone_id'];
+        
+        $regras = buscarTodasRegras($token, $zoneId);
+        $regrasPorEmail = indexarRegrasPorEmail($regras);
+        
+        $stmtContas = $pdo->prepare("SELECT id, email FROM contas WHERE destinada_a = ?");
         $stmtContas->execute([$pessoaId]);
         $contas = $stmtContas->fetchAll();
         
+        $stmtPessoa = $pdo->prepare("SELECT email FROM pessoas WHERE id = ?");
+        $stmtPessoa->execute([$pessoaId]);
+        $destEmail = $stmtPessoa->fetchColumn() ?: null;
+        
         foreach ($contas as $c) {
-            sincronizarRedirecionamentoConta($c['id'], $pdo);
+            $aliasEmail = $c['email'];
+            $regraExistente = $regrasPorEmail[strtolower(trim($aliasEmail))] ?? null;
+            
+            if (!empty($destEmail)) {
+                if ($regraExistente) {
+                    $destAtual = $regraExistente['actions'][0]['value'][0] ?? '';
+                    if (strtolower(trim($destAtual)) !== strtolower(trim($destEmail)) || !$regraExistente['enabled']) {
+                        atualizarRegraCloudflare($token, $zoneId, $regraExistente['id'], $aliasEmail, $destEmail);
+                    }
+                } else {
+                    criarRegraCloudflare($token, $zoneId, $aliasEmail, $destEmail);
+                }
+            } else {
+                if ($regraExistente) {
+                    excluirRegraCloudflare($token, $zoneId, $regraExistente['id']);
+                }
+            }
+        }
+    }
+}
+
+if (!function_exists('sincronizarRedirecionamentoContasMassa')) {
+    /**
+     * Sincroniza redirecionamentos para múltiplos IDs de contas de uma única vez.
+     * Otimizado para fazer apenas uma chamada de listagem de regras no Cloudflare.
+     */
+    function sincronizarRedirecionamentoContasMassa($idsArray, $pdo) {
+        $stmtConf = $pdo->query("SELECT cloudflare_token, cloudflare_zone_id FROM configuracoes LIMIT 1");
+        $config = $stmtConf->fetch();
+        
+        if (empty($config['cloudflare_token']) || empty($config['cloudflare_zone_id'])) {
+            return;
+        }
+        
+        $token = $config['cloudflare_token'];
+        $zoneId = $config['cloudflare_zone_id'];
+        
+        $regras = buscarTodasRegras($token, $zoneId);
+        $regrasPorEmail = indexarRegrasPorEmail($regras);
+        
+        foreach ($idsArray as $contaId) {
+            $stmtConta = $pdo->prepare("SELECT email, destinada_a FROM contas WHERE id = ?");
+            $stmtConta->execute([$contaId]);
+            $conta = $stmtConta->fetch();
+            
+            if (!$conta) continue;
+            
+            $aliasEmail = $conta['email'];
+            $pessoaId = $conta['destinada_a'];
+            
+            $destEmail = null;
+            if ($pessoaId) {
+                $stmtPessoa = $pdo->prepare("SELECT email FROM pessoas WHERE id = ?");
+                $stmtPessoa->execute([$pessoaId]);
+                $destEmail = $stmtPessoa->fetchColumn() ?: null;
+            }
+            
+            $regraExistente = $regrasPorEmail[strtolower(trim($aliasEmail))] ?? null;
+            
+            if (!empty($destEmail)) {
+                if ($regraExistente) {
+                    $destAtual = $regraExistente['actions'][0]['value'][0] ?? '';
+                    if (strtolower(trim($destAtual)) !== strtolower(trim($destEmail)) || !$regraExistente['enabled']) {
+                        atualizarRegraCloudflare($token, $zoneId, $regraExistente['id'], $aliasEmail, $destEmail);
+                    }
+                } else {
+                    criarRegraCloudflare($token, $zoneId, $aliasEmail, $destEmail);
+                }
+            } else {
+                if ($regraExistente) {
+                    excluirRegraCloudflare($token, $zoneId, $regraExistente['id']);
+                }
+            }
         }
     }
 }
@@ -248,6 +388,40 @@ if (!function_exists('removerRedirecionamentoConta')) {
         $regraExistente = buscarRegraPorEmail($token, $zoneId, $email);
         if ($regraExistente) {
             excluirRegraCloudflare($token, $zoneId, $regraExistente['id']);
+        }
+    }
+}
+
+if (!function_exists('removerRedirecionamentoContasMassa')) {
+    /**
+     * Exclui redirecionamentos de múltiplas contas de uma só vez.
+     * Otimizado para fazer apenas uma chamada de listagem de regras no Cloudflare.
+     */
+    function removerRedirecionamentoContasMassa($idsArray, $pdo) {
+        $stmtConf = $pdo->query("SELECT cloudflare_token, cloudflare_zone_id FROM configuracoes LIMIT 1");
+        $config = $stmtConf->fetch();
+        
+        if (empty($config['cloudflare_token']) || empty($config['cloudflare_zone_id'])) {
+            return;
+        }
+        
+        $token = $config['cloudflare_token'];
+        $zoneId = $config['cloudflare_zone_id'];
+        
+        $regras = buscarTodasRegras($token, $zoneId);
+        $regrasPorEmail = indexarRegrasPorEmail($regras);
+        
+        foreach ($idsArray as $contaId) {
+            $stmtConta = $pdo->prepare("SELECT email FROM contas WHERE id = ?");
+            $stmtConta->execute([$contaId]);
+            $email = $stmtConta->fetchColumn();
+            
+            if (!$email) continue;
+            
+            $regraExistente = $regrasPorEmail[strtolower(trim($email))] ?? null;
+            if ($regraExistente) {
+                excluirRegraCloudflare($token, $zoneId, $regraExistente['id']);
+            }
         }
     }
 }

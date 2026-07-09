@@ -260,9 +260,7 @@ switch ($acao) {
             $idsArray = array_filter(array_map('intval', explode(',', $ids)));
             if (count($idsArray) > 0) {
                 require_once 'cloudflare_helper.php';
-                foreach ($idsArray as $id) {
-                    removerRedirecionamentoConta($id, $pdo);
-                }
+                removerRedirecionamentoContasMassa($idsArray, $pdo);
                 $in = str_repeat('?,', count($idsArray) - 1) . '?';
                 $pdo->prepare("DELETE FROM contas WHERE id IN ($in)")->execute($idsArray);
             }
@@ -284,9 +282,7 @@ switch ($acao) {
                 }
                 
                 require_once 'cloudflare_helper.php';
-                foreach ($idsArray as $id) {
-                    sincronizarRedirecionamentoConta($id, $pdo);
-                }
+                sincronizarRedirecionamentoContasMassa($idsArray, $pdo);
             }
         }
         break;
@@ -524,10 +520,10 @@ switch ($acao) {
             // Deletar a pessoa
             $pdo->prepare("DELETE FROM pessoas WHERE id = ?")->execute([$id]);
             
-            // Sincronizar as contas afetadas no Cloudflare para remover as regras
-            require_once 'cloudflare_helper.php';
-            foreach ($contasAfetadas as $contaId) {
-                sincronizarRedirecionamentoConta($contaId, $pdo);
+            // Sincronizar as contas afetadas no Cloudflare para remover as regras (em lote)
+            if (count($contasAfetadas) > 0) {
+                require_once 'cloudflare_helper.php';
+                removerRedirecionamentoContasMassa($contasAfetadas, $pdo);
             }
         }
         break;
@@ -536,6 +532,14 @@ switch ($acao) {
         $id = filter_input(INPUT_POST, 'pessoa_id', FILTER_VALIDATE_INT);
         $email = trim($_POST['email'] ?? '') ?: null;
         if ($id) {
+            // Obter e-mail anterior
+            $stmtOld = $pdo->prepare("SELECT email FROM pessoas WHERE id = ?");
+            $stmtOld->execute([$id]);
+            $oldEmail = $stmtOld->fetchColumn() ?: null;
+            
+            // Só sincroniza se o e-mail realmente mudou
+            $emailMudou = (strtolower(trim($oldEmail ?? '')) !== strtolower(trim($email ?? '')));
+            
             try {
                 $pdo->prepare("UPDATE pessoas SET email = ? WHERE id = ?")->execute([$email, $id]);
             } catch (PDOException $e) {
@@ -551,11 +555,14 @@ switch ($acao) {
                     die("Erro ao atualizar e-mail: " . $e->getMessage());
                 }
             }
-            try {
-                require_once 'cloudflare_helper.php';
-                sincronizarRedirecionamentosPessoa($id, $pdo);
-            } catch (Exception $e) {
-                // Sincronização de regras falhou ou Cloudflare indisponível, mas salvou o e-mail localmente.
+            
+            if ($emailMudou) {
+                try {
+                    require_once 'cloudflare_helper.php';
+                    sincronizarRedirecionamentosPessoa($id, $pdo);
+                } catch (Exception $e) {
+                    // Sincronização de regras falhou ou Cloudflare indisponível, mas salvou o e-mail localmente.
+                }
             }
         }
         break;
