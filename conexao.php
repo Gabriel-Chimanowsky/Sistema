@@ -481,108 +481,128 @@ if (!function_exists('sincronizarSlackTracker')) {
             if (!$week_row_id) return;
 
             // 5. Contar e sincronizar Lotes de 50 Perfis Criados
-            $contasUnsynced = $pdo->query("SELECT id FROM contas WHERE status IN ('criada', 'autenticada', 'exportado') AND slack_perfil_sync = 0 ORDER BY id ASC")->fetchAll();
-            $totalUnsynced = count($contasUnsynced);
+            $contasUnsynced = $pdo->query("SELECT id, email FROM contas WHERE status IN ('criada', 'autenticada', 'exportado') AND slack_perfil_sync = 0 ORDER BY id ASC")->fetchAll();
+            
+            $perfisPorDominio = [];
+            foreach ($contasUnsynced as $c) {
+                $domainEmail = strtolower(trim(explode('@', $c['email'])[1] ?? ''));
+                $domName = strtolower(explode('.', $domainEmail)[0] ?? 'dollfinn');
+                if (empty($domName)) $domName = 'dollfinn';
+                $perfisPorDominio[$domName][] = $c['id'];
+            }
 
-            if ($totalUnsynced >= 50) {
-                // Obter count acumulado de lotes para este domínio (independente de semana ou lista)
-                $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM slack_lotes_count WHERE domain = ? AND type = 'perfil'");
-                $stmtCount->execute([$nomeDominio]);
-                $loteCount = (int) $stmtCount->fetchColumn();
+            foreach ($perfisPorDominio as $domName => $idsDaZone) {
+                $totalZone = count($idsDaZone);
+                if ($totalZone >= 50) {
+                    // Obter count acumulado de lotes para este domínio (independente de semana ou lista)
+                    $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM slack_lotes_count WHERE domain = ? AND type = 'perfil'");
+                    $stmtCount->execute([$domName]);
+                    $loteCount = (int) $stmtCount->fetchColumn();
 
-                $startRange = ($loteCount * 50) + 1;
-                $endRange = ($loteCount + 1) * 50;
-                $loteText = "{$startRange} - {$endRange} perfis {$nomeDominio}";
-                $hoje = date('Y-m-d');
+                    $startRange = ($loteCount * 50) + 1;
+                    $endRange = ($loteCount + 1) * 50;
+                    $loteText = "{$startRange} - {$endRange} perfis {$domName}";
+                    $hoje = date('Y-m-d');
 
-                $chSub = curl_init("https://slack.com/api/slackLists.items.create");
-                curl_setopt($chSub, CURLOPT_RETURNTRANSFER, true);
-                curl_setopt($chSub, CURLOPT_POST, true);
-                curl_setopt($chSub, CURLOPT_HTTPHEADER, [
-                    "Authorization: Bearer " . $token,
-                    "Content-Type: application/json; charset=utf-8"
-                ]);
-                curl_setopt($chSub, CURLOPT_POSTFIELDS, json_encode([
-                    "list_id" => $list_id,
-                    "parent_item_id" => $week_row_id,
-                    "initial_fields" => [
-                        [
-                            "column_id" => $primary_col_id,
-                            "rich_text" => buildRichText($loteText)
-                        ],
-                        [
-                            "column_id" => "Col00",
-                            "checkbox" => true
-                        ],
-                        [
-                            "column_id" => "Col02",
-                            "date" => [$hoje]
+                    $chSub = curl_init("https://slack.com/api/slackLists.items.create");
+                    curl_setopt($chSub, CURLOPT_RETURNTRANSFER, true);
+                    curl_setopt($chSub, CURLOPT_POST, true);
+                    curl_setopt($chSub, CURLOPT_HTTPHEADER, [
+                        "Authorization: Bearer " . $token,
+                        "Content-Type: application/json; charset=utf-8"
+                    ]);
+                    curl_setopt($chSub, CURLOPT_POSTFIELDS, json_encode([
+                        "list_id" => $list_id,
+                        "parent_item_id" => $week_row_id,
+                        "initial_fields" => [
+                            [
+                                "column_id" => $primary_col_id,
+                                "rich_text" => buildRichText($loteText)
+                            ],
+                            [
+                                "column_id" => "Col00",
+                                "checkbox" => true
+                            ],
+                            [
+                                "column_id" => "Col02",
+                                "date" => [$hoje]
+                            ]
                         ]
-                    ]
-                ]));
-                $subRes = json_decode(curl_exec($chSub), true);
-                curl_close($chSub);
+                    ]));
+                    $subRes = json_decode(curl_exec($chSub), true);
+                    curl_close($chSub);
 
-                if ($subRes && isset($subRes['ok']) && $subRes['ok']) {
-                    // Registra que um novo lote foi criado
-                    $pdo->prepare("INSERT INTO slack_lotes_count (list_id, week, type, domain) VALUES (?, ?, ?, ?)")->execute([$list_id, $week_title, 'perfil', $nomeDominio]);
+                    if ($subRes && isset($subRes['ok']) && $subRes['ok']) {
+                        // Registra que um novo lote foi criado
+                        $pdo->prepare("INSERT INTO slack_lotes_count (list_id, week, type, domain) VALUES (?, ?, ?, ?)")->execute([$list_id, $week_title, 'perfil', $domName]);
 
-                    $idsToUpdate = array_slice(array_column($contasUnsynced, 'id'), 0, 50);
-                    $in = str_repeat('?,', count($idsToUpdate) - 1) . '?';
-                    $pdo->prepare("UPDATE contas SET slack_perfil_sync = 1 WHERE id IN ($in)")->execute($idsToUpdate);
+                        $idsToUpdate = array_slice($idsDaZone, 0, 50);
+                        $in = str_repeat('?,', count($idsToUpdate) - 1) . '?';
+                        $pdo->prepare("UPDATE contas SET slack_perfil_sync = 1 WHERE id IN ($in)")->execute($idsToUpdate);
+                    }
                 }
             }
 
             // 6. Contar e sincronizar Lotes de 50 BMs Criadas
-            $bmsUnsynced = $pdo->query("SELECT id FROM contas WHERE bm_criada = 1 AND slack_bm_sync = 0 ORDER BY data_bm_criada ASC")->fetchAll();
-            $totalBmsUnsynced = count($bmsUnsynced);
+            $bmsUnsynced = $pdo->query("SELECT id, email FROM contas WHERE bm_criada = 1 AND slack_bm_sync = 0 ORDER BY data_bm_criada ASC")->fetchAll();
+            
+            $bmsPorDominio = [];
+            foreach ($bmsUnsynced as $b) {
+                $domainEmail = strtolower(trim(explode('@', $b['email'])[1] ?? ''));
+                $domName = strtolower(explode('.', $domainEmail)[0] ?? 'dollfinn');
+                if (empty($domName)) $domName = 'dollfinn';
+                $bmsPorDominio[$domName][] = $b['id'];
+            }
 
-            if ($totalBmsUnsynced >= 50) {
-                // Obter count acumulado de lotes para este domínio (independente de semana ou lista)
-                $stmtCountBm = $pdo->prepare("SELECT COUNT(*) FROM slack_lotes_count WHERE domain = ? AND type = 'bm'");
-                $stmtCountBm->execute([$nomeDominio]);
-                $loteCountBm = (int) $stmtCountBm->fetchColumn();
+            foreach ($bmsPorDominio as $domName => $idsDaZone) {
+                $totalZone = count($idsDaZone);
+                if ($totalZone >= 50) {
+                    // Obter count acumulado de lotes para este domínio (independente de semana ou lista)
+                    $stmtCountBm = $pdo->prepare("SELECT COUNT(*) FROM slack_lotes_count WHERE domain = ? AND type = 'bm'");
+                    $stmtCountBm->execute([$domName]);
+                    $loteCountBm = (int) $stmtCountBm->fetchColumn();
 
-                $startRangeBm = ($loteCountBm * 50) + 1;
-                $endRangeBm = ($loteCountBm + 1) * 50;
-                $loteTextBm = "{$startRangeBm} - {$endRangeBm} BMs {$nomeDominio}";
-                $hoje = date('Y-m-d');
+                    $startRangeBm = ($loteCountBm * 50) + 1;
+                    $endRangeBm = ($loteCountBm + 1) * 50;
+                    $loteTextBm = "{$startRangeBm} - {$endRangeBm} BMs {$domName}";
+                    $hoje = date('Y-m-d');
 
-                $chSub = curl_init("https://slack.com/api/slackLists.items.create");
-                curl_setopt($chSub, CURLOPT_RETURNTRANSFER, true);
-                curl_setopt($chSub, CURLOPT_POST, true);
-                curl_setopt($chSub, CURLOPT_HTTPHEADER, [
-                    "Authorization: Bearer " . $token,
-                    "Content-Type: application/json; charset=utf-8"
-                ]);
-                curl_setopt($chSub, CURLOPT_POSTFIELDS, json_encode([
-                    "list_id" => $list_id,
-                    "parent_item_id" => $week_row_id,
-                    "initial_fields" => [
-                        [
-                            "column_id" => $primary_col_id,
-                            "rich_text" => buildRichText($loteTextBm)
-                        ],
-                        [
-                            "column_id" => "Col00",
-                            "checkbox" => true
-                        ],
-                        [
-                            "column_id" => "Col02",
-                            "date" => [$hoje]
+                    $chSub = curl_init("https://slack.com/api/slackLists.items.create");
+                    curl_setopt($chSub, CURLOPT_RETURNTRANSFER, true);
+                    curl_setopt($chSub, CURLOPT_POST, true);
+                    curl_setopt($chSub, CURLOPT_HTTPHEADER, [
+                        "Authorization: Bearer " . $token,
+                        "Content-Type: application/json; charset=utf-8"
+                    ]);
+                    curl_setopt($chSub, CURLOPT_POSTFIELDS, json_encode([
+                        "list_id" => $list_id,
+                        "parent_item_id" => $week_row_id,
+                        "initial_fields" => [
+                            [
+                                "column_id" => $primary_col_id,
+                                "rich_text" => buildRichText($loteTextBm)
+                            ],
+                            [
+                                "column_id" => "Col00",
+                                "checkbox" => true
+                            ],
+                            [
+                                "column_id" => "Col02",
+                                "date" => [$hoje]
+                            ]
                         ]
-                    ]
-                ]));
-                $subRes = json_decode(curl_exec($chSub), true);
-                curl_close($chSub);
+                    ]));
+                    $subRes = json_decode(curl_exec($chSub), true);
+                    curl_close($chSub);
 
-                if ($subRes && isset($subRes['ok']) && $subRes['ok']) {
-                    // Registra que um novo lote foi criado
-                    $pdo->prepare("INSERT INTO slack_lotes_count (list_id, week, type, domain) VALUES (?, ?, ?, ?)")->execute([$list_id, $week_title, 'bm', $nomeDominio]);
+                    if ($subRes && isset($subRes['ok']) && $subRes['ok']) {
+                        // Registra que um novo lote foi criado
+                        $pdo->prepare("INSERT INTO slack_lotes_count (list_id, week, type, domain) VALUES (?, ?, ?, ?)")->execute([$list_id, $week_title, 'bm', $domName]);
 
-                    $idsToUpdate = array_slice(array_column($bmsUnsynced, 'id'), 0, 50);
-                    $in = str_repeat('?,', count($idsToUpdate) - 1) . '?';
-                    $pdo->prepare("UPDATE contas SET slack_bm_sync = 1 WHERE id IN ($in)")->execute($idsToUpdate);
+                        $idsToUpdate = array_slice($idsDaZone, 0, 50);
+                        $in = str_repeat('?,', count($idsToUpdate) - 1) . '?';
+                        $pdo->prepare("UPDATE contas SET slack_bm_sync = 1 WHERE id IN ($in)")->execute($idsToUpdate);
+                    }
                 }
             }
         } catch (Exception $e) {
