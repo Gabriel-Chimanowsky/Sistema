@@ -408,8 +408,27 @@ switch ($acao) {
                 }
 
                 try {
-                    $sql = "INSERT INTO contas (nome, sobrenome, username, email, senha, genero, pais, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'pendente')";
-                    $pdo->prepare($sql)->execute([$dados['nome'], $dados['sobrenome'], $dados['username'], $email, $config['senha_padrao'], $genero, $pais]);
+                    // Obter índice do domínio para calcular o ID correspondente (preserva ordem histórica por menor ID)
+                    $dominioAlvo = strtolower(trim(str_replace('@', '', $config['email_dominio'])));
+                    $stmtDom = $pdo->query("
+                        SELECT 
+                            LOWER(SUBSTRING_INDEX(email, '@', -1)) as dom,
+                            MIN(id) as min_id
+                        FROM contas 
+                        GROUP BY dom
+                        ORDER BY min_id ASC
+                    ");
+                    $domsExistentes = array_column($stmtDom->fetchAll(), 'dom');
+                    $k = array_search($dominioAlvo, $domsExistentes);
+                    if ($k === false) {
+                        $k = count($domsExistentes);
+                    }
+                    
+                    $contador = (int)$config['email_contador'];
+                    $novoId = (300 * $k) + $contador;
+
+                    $sql = "INSERT INTO contas (id, nome, sobrenome, username, email, senha, genero, pais, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pendente')";
+                    $pdo->prepare($sql)->execute([$novoId, $dados['nome'], $dados['sobrenome'], $dados['username'], $email, $config['senha_padrao'], $genero, $pais]);
                     
                     // Incrementa para o próximo e-mail de forma bem sucedida
                     $config['email_contador']++;
