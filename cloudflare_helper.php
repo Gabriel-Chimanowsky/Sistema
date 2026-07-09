@@ -4,6 +4,28 @@
  * Fornece funções para gerenciar redirecionamentos diretamente no Cloudflare.
  */
 
+if (!function_exists('registrarCfLog')) {
+    /**
+     * Grava logs de depuração no banco de dados (tabela cloudflare_api_logs)
+     * e também em arquivo físico se houver permissão de gravação.
+     */
+    function registrarCfLog($texto, $pdo = null) {
+        if ($pdo === null) {
+            global $pdo;
+        }
+        if (isset($pdo)) {
+            try {
+                $pdo->prepare("INSERT INTO cloudflare_api_logs (texto) VALUES (?)")->execute([$texto]);
+            } catch (Exception $e) {
+                // Silencia se houver erro ao gravar log no banco
+            }
+        }
+        // Fallback para arquivo
+        $logFile = __DIR__ . '/cloudflare_api_debug.log';
+        @file_put_contents($logFile, $texto, FILE_APPEND);
+    }
+}
+
 if (!function_exists('cfApiCall')) {
     /**
      * Faz chamadas HTTP cURL para a API do Cloudflare.
@@ -32,7 +54,6 @@ if (!function_exists('cfApiCall')) {
         curl_close($ch);
         
         // --- LOG DE DEBUG DA API DO CLOUDFLARE ---
-        $logFile = __DIR__ . '/cloudflare_api_debug.log';
         $logData = date('[Y-m-d H:i:s]') . " {$method} {$url}\n";
         if ($body !== null) {
             $logData .= "Request Body: " . json_encode($body) . "\n";
@@ -44,7 +65,7 @@ if (!function_exists('cfApiCall')) {
             $logData .= "Response: " . substr($response, 0, 500) . "\n";
         }
         $logData .= "--------------------------------------------------\n";
-        @file_put_contents($logFile, $logData, FILE_APPEND);
+        registrarCfLog($logData, $pdo);
         // ------------------------------------------
         
         if ($curlError) {
@@ -170,7 +191,6 @@ if (!function_exists('sincronizarRedirecionamentoConta')) {
      * Cria, atualiza ou exclui a regra conforme a existência do dono e do e-mail de destino.
      */
     function sincronizarRedirecionamentoConta($contaId, $pdo) {
-        $logFile = __DIR__ . '/cloudflare_api_debug.log';
         $logData = date('[Y-m-d H:i:s]') . " [START] sincronizarRedirecionamentoConta para Conta ID: {$contaId}\n";
         
         // 1. Obter configurações do Cloudflare
@@ -181,7 +201,7 @@ if (!function_exists('sincronizarRedirecionamentoConta')) {
         $zoneId = $config['cloudflare_zone_id'] ?? '';
         
         $logData .= "Credenciais - Token: " . (!empty($token) ? 'definido' : 'VAZIO') . " | Zone ID: " . (!empty($zoneId) ? 'definido' : 'VAZIO') . "\n";
-        @file_put_contents($logFile, $logData, FILE_APPEND);
+        registrarCfLog($logData, $pdo);
         
         if (empty($token) || empty($zoneId)) {
             return; // Cloudflare não está configurado
@@ -286,7 +306,6 @@ if (!function_exists('sincronizarRedirecionamentosPessoa')) {
      * Otimizado para fazer apenas uma chamada de listagem de regras no Cloudflare.
      */
     function sincronizarRedirecionamentosPessoa($pessoaId, $pdo) {
-        $logFile = __DIR__ . '/cloudflare_api_debug.log';
         $logData = date('[Y-m-d H:i:s]') . " [START] sincronizarRedirecionamentosPessoa para Pessoa ID: {$pessoaId}\n";
         
         $stmtConf = $pdo->query("SELECT cloudflare_token, cloudflare_zone_id FROM configuracoes LIMIT 1");
@@ -296,7 +315,7 @@ if (!function_exists('sincronizarRedirecionamentosPessoa')) {
         $zoneId = $config['cloudflare_zone_id'] ?? '';
         
         $logData .= "Credenciais - Token: " . (!empty($token) ? 'definido' : 'VAZIO') . " | Zone ID: " . (!empty($zoneId) ? 'definido' : 'VAZIO') . "\n";
-        @file_put_contents($logFile, $logData, FILE_APPEND);
+        registrarCfLog($logData, $pdo);
         
         if (empty($token) || empty($zoneId)) {
             return;

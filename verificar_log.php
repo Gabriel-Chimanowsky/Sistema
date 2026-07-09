@@ -44,6 +44,9 @@ $processaFile = __DIR__ . '/processa.php';
 
         <?php
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['acao'] ?? '') === 'limpar_log') {
+            try {
+                $pdo->query("TRUNCATE TABLE cloudflare_api_logs");
+            } catch (Exception $e) {}
             if (file_exists($logFile)) {
                 @unlink($logFile);
             }
@@ -149,10 +152,22 @@ $processaFile = __DIR__ . '/processa.php';
             <h2 class="text-sm font-bold text-white uppercase tracking-wider text-slate-400">📜 Histórico de Comunicação (Logs da API)</h2>
             <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800 shadow-2xl">
                 <pre class="text-xs text-emerald-400 overflow-x-auto h-[400px] overflow-y-auto whitespace-pre-wrap leading-relaxed"><?php
+                    $logs = [];
+                    try {
+                        $stmtLogs = $pdo->query("SELECT texto FROM cloudflare_api_logs ORDER BY id DESC LIMIT 100");
+                        $logs = array_reverse(array_column($stmtLogs->fetchAll(), 'texto'));
+                    } catch (Exception $e) {
+                        $logs[] = "Erro ao ler logs do banco: " . $e->getMessage() . "\n";
+                    }
+                    
                     if (file_exists($logFile)) {
-                        echo htmlspecialchars(file_get_contents($logFile));
-                    } else {
+                        $logs[] = "\n--- LOGS DO ARQUIVO FÍSICO ---\n" . file_get_contents($logFile);
+                    }
+                    
+                    if (empty($logs) || (count($logs) === 1 && empty(trim($logs[0])))) {
                         echo "Nenhum histórico de log gravado até o momento.\n\nSe os status acima estiverem verdes, tente mudar o e-mail de algum cliente para disparar a sincronização.";
+                    } else {
+                        echo htmlspecialchars(implode("", $logs));
                     }
                 ?></pre>
             </div>

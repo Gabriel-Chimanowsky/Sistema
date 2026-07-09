@@ -165,6 +165,13 @@ try {
             $pdo->query("ALTER TABLE pessoas ADD COLUMN comentario TEXT NULL DEFAULT NULL");
         }
 
+        // 7. Tabela cloudflare_api_logs
+        $pdo->query("CREATE TABLE IF NOT EXISTS `cloudflare_api_logs` (
+            `id` INT AUTO_INCREMENT PRIMARY KEY,
+            `criado_em` DATETIME DEFAULT CURRENT_TIMESTAMP,
+            `texto` TEXT NOT NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
     } catch (Exception $e) {
         // Silenciar erro em produção ou logar
     }
