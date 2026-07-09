@@ -155,6 +155,16 @@ try {
             $pdo->query("ALTER TABLE apps ADD COLUMN user_access_token TEXT NULL");
         }
 
+        // 6. Tabela pessoas
+        $stmtPessoasCols = $pdo->query("SHOW COLUMNS FROM pessoas");
+        $colunasPessoas = array_column($stmtPessoasCols->fetchAll(), 'Field');
+        if (!in_array('email', $colunasPessoas)) {
+            $pdo->query("ALTER TABLE pessoas ADD COLUMN email VARCHAR(255) NULL DEFAULT NULL");
+        }
+        if (!in_array('comentario', $colunasPessoas)) {
+            $pdo->query("ALTER TABLE pessoas ADD COLUMN comentario TEXT NULL DEFAULT NULL");
+        }
+
     } catch (Exception $e) {
         // Silenciar erro em produção ou logar
     }

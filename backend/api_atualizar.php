@@ -33,6 +33,9 @@ try {
         $pessoa_id = filter_input(INPUT_POST, 'pessoa_id', FILTER_VALIDATE_INT) ?: null;
         $sql = "UPDATE contas SET destinada_a = ? WHERE id = ?";
         $pdo->prepare($sql)->execute([$pessoa_id, $id]);
+        
+        require_once '../cloudflare_helper.php';
+        sincronizarRedirecionamentoConta($id, $pdo);
     }
 
     echo json_encode(["sucesso" => true]);

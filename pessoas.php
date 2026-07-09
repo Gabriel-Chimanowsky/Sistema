@@ -8,10 +8,7 @@ if (isFinanceiro()) {
     exit;
 }
 
-// Garante que a coluna comentario existe
-try { $pdo->query("SELECT comentario FROM pessoas LIMIT 1"); } catch (Exception $e) {
-    $pdo->query("ALTER TABLE pessoas ADD COLUMN comentario TEXT DEFAULT NULL");
-}
+// Migrations are handled globally in conexao.php
 $stmtPessoas = $pdo->query("SELECT * FROM pessoas ORDER BY nome ASC");
 $pessoas = $stmtPessoas->fetchAll();
 ?>
@@ -49,11 +46,13 @@ $pessoas = $stmtPessoas->fetchAll();
                 Gerenciar Clientes
             </h1>
 
-            <form method="POST" action="processa.php" class="flex gap-3 mb-12">
+            <form method="POST" action="processa.php" class="flex flex-col md:flex-row gap-3 mb-12">
                 <input type="hidden" name="acao" value="add_pessoa">
                 <input type="text" name="nome_pessoa" placeholder="Nome do Cliente / Destinatário" required 
                     class="flex-1 bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-blue-500 p-4 rounded-2xl outline-none transition-all font-bold">
-                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-2xl font-black shadow-lg shadow-blue-600/30 transition-all active:scale-95">
+                <input type="email" name="email_pessoa" placeholder="E-mail de Destino (Opcional)" 
+                    class="flex-1 bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-blue-500 p-4 rounded-2xl outline-none transition-all font-bold">
+                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-2xl font-black shadow-lg shadow-blue-600/30 transition-all active:scale-95 shrink-0">
                     Adicionar
                 </button>
             </form>
@@ -109,6 +108,38 @@ $pessoas = $stmtPessoas->fetchAll();
                                 </form>
                             </div>
                         </div>
+
+                        <!-- Email editável -->
+                        <div class="mt-2 pl-[52px]">
+                            <div id="email-display-<?= $p['id'] ?>" class="flex items-center gap-2">
+                                <i data-lucide="mail" class="w-3.5 h-3.5 text-slate-400 shrink-0"></i>
+                                <?php if (!empty($p['email'])): ?>
+                                    <span class="text-sm text-slate-600 dark:text-slate-300 font-semibold flex-1 overflow-hidden text-ellipsis whitespace-nowrap"><?= htmlspecialchars($p['email']) ?></span>
+                                <?php else: ?>
+                                    <span class="text-sm text-slate-400 dark:text-slate-500 italic flex-1">Sem e-mail (Cloudflare)</span>
+                                <?php endif; ?>
+                                <button type="button" onclick="abrirEmail(<?= $p['id'] ?>, <?= json_encode($p['email'] ?? '') ?>)"
+                                    class="shrink-0 p-1 text-slate-300 hover:text-blue-500 rounded-lg transition-all" title="Editar e-mail">
+                                    <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                                </button>
+                            </div>
+                            <div id="email-form-<?= $p['id'] ?>" class="hidden mt-2">
+                                <form method="POST" action="processa.php" class="flex gap-2">
+                                    <input type="hidden" name="acao" value="salvar_email_pessoa">
+                                    <input type="hidden" name="pessoa_id" value="<?= $p['id'] ?>">
+                                    <input type="email" name="email" id="email-input-<?= $p['id'] ?>"
+                                        placeholder="Ex: cliente@gmail.com"
+                                        class="flex-1 text-sm bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 focus:border-blue-500 px-3 py-1.5 rounded-xl outline-none transition-all font-semibold">
+                                    <button type="submit" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-xl font-semibold transition-all active:scale-95" title="Salvar">
+                                        <i data-lucide="check" class="w-3.5 h-3.5"></i>
+                                    </button>
+                                    <button type="button" onclick="fecharEmail(<?= $p['id'] ?>)"
+                                        class="px-3 py-1.5 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-sm rounded-xl font-semibold transition-all" title="Cancelar">
+                                        <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
                     </div>
                 <?php endforeach; ?>
                 
@@ -151,6 +182,19 @@ $pessoas = $stmtPessoas->fetchAll();
         function fecharComentario(id) {
             document.getElementById('comentario-display-' + id).classList.remove('hidden');
             document.getElementById('comentario-form-' + id).classList.add('hidden');
+        }
+
+        function abrirEmail(id, valorAtual) {
+            document.getElementById('email-display-' + id).classList.add('hidden');
+            const formDiv = document.getElementById('email-form-' + id);
+            formDiv.classList.remove('hidden');
+            const input = document.getElementById('email-input-' + id);
+            input.value = valorAtual || '';
+            input.focus();
+        }
+        function fecharEmail(id) {
+            document.getElementById('email-display-' + id).classList.remove('hidden');
+            document.getElementById('email-form-' + id).classList.add('hidden');
         }
 
         let formAlvo = null;

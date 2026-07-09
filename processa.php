@@ -259,6 +259,10 @@ switch ($acao) {
         if (!empty($ids)) {
             $idsArray = array_filter(array_map('intval', explode(',', $ids)));
             if (count($idsArray) > 0) {
+                require_once 'cloudflare_helper.php';
+                foreach ($idsArray as $id) {
+                    removerRedirecionamentoConta($id, $pdo);
+                }
                 $in = str_repeat('?,', count($idsArray) - 1) . '?';
                 $pdo->prepare("DELETE FROM contas WHERE id IN ($in)")->execute($idsArray);
             }
@@ -277,6 +281,11 @@ switch ($acao) {
                     $pdo->prepare("UPDATE contas SET destinada_a = ?, data_vinculo = NOW() WHERE id IN ($in)")->execute($params);
                 } else {
                     $pdo->prepare("UPDATE contas SET destinada_a = NULL, data_vinculo = NULL WHERE id IN ($in)")->execute($idsArray);
+                }
+                
+                require_once 'cloudflare_helper.php';
+                foreach ($idsArray as $id) {
+                    sincronizarRedirecionamentoConta($id, $pdo);
                 }
             }
         }
@@ -441,7 +450,11 @@ switch ($acao) {
 
     case 'del_conta':
         $id = filter_input(INPUT_POST, 'conta_id', FILTER_VALIDATE_INT);
-        if ($id) $pdo->prepare("DELETE FROM contas WHERE id = ?")->execute([$id]);
+        if ($id) {
+            require_once 'cloudflare_helper.php';
+            removerRedirecionamentoConta($id, $pdo);
+            $pdo->prepare("DELETE FROM contas WHERE id = ?")->execute([$id]);
+        }
         break;
 
     case 'vincular_pessoa':
@@ -450,8 +463,10 @@ switch ($acao) {
         if ($pessoa_id) {
             $pdo->prepare("UPDATE contas SET destinada_a = ?, data_vinculo = NOW() WHERE id = ?")->execute([$pessoa_id, $id]);
         } else {
-            $pdo->prepare("UPDATE contas SET destinada_a = ?, data_vinculo = NULL WHERE id = ?")->execute([$pessoa_id, $id]);
+            $pdo->prepare("UPDATE contas SET destinada_a = NULL, data_vinculo = NULL WHERE id = ?")->execute([$id]);
         }
+        require_once 'cloudflare_helper.php';
+        sincronizarRedirecionamentoConta($id, $pdo);
         break;
 
     case 'salvar_2fa':
@@ -478,12 +493,39 @@ switch ($acao) {
 
     case 'add_pessoa':
         $nome = trim($_POST['nome_pessoa'] ?? '');
-        if ($nome) $pdo->prepare("INSERT INTO pessoas (nome) VALUES (?)")->execute([$nome]);
+        $email = trim($_POST['email_pessoa'] ?? '') ?: null;
+        if ($nome) {
+            $pdo->prepare("INSERT INTO pessoas (nome, email) VALUES (?, ?)")->execute([$nome, $email]);
+        }
         break;
 
     case 'del_pessoa':
         $id = filter_input(INPUT_POST, 'pessoa_id', FILTER_VALIDATE_INT);
-        if ($id) $pdo->prepare("DELETE FROM pessoas WHERE id = ?")->execute([$id]);
+        if ($id) {
+            // Buscar todas as contas destinadas a esta pessoa antes de deletar
+            $stmtContas = $pdo->prepare("SELECT id FROM contas WHERE destinada_a = ?");
+            $stmtContas->execute([$id]);
+            $contasAfetadas = $stmtContas->fetchAll(PDO::FETCH_COLUMN);
+            
+            // Deletar a pessoa
+            $pdo->prepare("DELETE FROM pessoas WHERE id = ?")->execute([$id]);
+            
+            // Sincronizar as contas afetadas no Cloudflare para remover as regras
+            require_once 'cloudflare_helper.php';
+            foreach ($contasAfetadas as $contaId) {
+                sincronizarRedirecionamentoConta($contaId, $pdo);
+            }
+        }
+        break;
+
+    case 'salvar_email_pessoa':
+        $id = filter_input(INPUT_POST, 'pessoa_id', FILTER_VALIDATE_INT);
+        $email = trim($_POST['email'] ?? '') ?: null;
+        if ($id) {
+            $pdo->prepare("UPDATE pessoas SET email = ? WHERE id = ?")->execute([$email, $id]);
+            require_once 'cloudflare_helper.php';
+            sincronizarRedirecionamentosPessoa($id, $pdo);
+        }
         break;
 
     case 'salvar_nota_conta':
