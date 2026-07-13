@@ -292,14 +292,20 @@ switch ($acao) {
         if (!empty($ids)) {
             $idsArray = array_filter(array_map('intval', explode(',', $ids)));
             foreach ($idsArray as $rid) {
-                $stmt = $pdo->prepare("SELECT genero, pais FROM contas WHERE id = ?");
+                $stmt = $pdo->prepare("SELECT genero, pais, status FROM contas WHERE id = ?");
                 $stmt->execute([$rid]);
                 $conta = $stmt->fetch();
                 if ($conta) {
                     $dados = gerarNomeAleatorio($conta['genero'], $conta['pais']);
                     if ($dados) {
-                        $pdo->prepare("UPDATE contas SET nome = ?, sobrenome = ?, username = ? WHERE id = ?")
-                            ->execute([$dados['nome'], $dados['sobrenome'], $dados['username'], $rid]);
+                        // Se a conta estava como 'criada', volta para 'pendente' para ser recriada
+                        if ($conta['status'] === 'criada') {
+                            $pdo->prepare("UPDATE contas SET nome = ?, sobrenome = ?, username = ?, status = 'pendente' WHERE id = ?")
+                                ->execute([$dados['nome'], $dados['sobrenome'], $dados['username'], $rid]);
+                        } else {
+                            $pdo->prepare("UPDATE contas SET nome = ?, sobrenome = ?, username = ? WHERE id = ?")
+                                ->execute([$dados['nome'], $dados['sobrenome'], $dados['username'], $rid]);
+                        }
                     }
                 }
                 usleep(150000); // 150ms entre requests para não sobrecarregar a API
@@ -450,15 +456,21 @@ switch ($acao) {
 
     case 'regerar_conta':
         $id = filter_input(INPUT_POST, 'conta_id', FILTER_VALIDATE_INT);
-        $stmt = $pdo->prepare("SELECT genero, pais FROM contas WHERE id = ?");
+        $stmt = $pdo->prepare("SELECT genero, pais, status FROM contas WHERE id = ?");
         $stmt->execute([$id]);
         $conta = $stmt->fetch();
 
         if ($conta) {
             $dados = gerarNomeAleatorio($conta['genero'], $conta['pais']);
             if ($dados) {
-                $pdo->prepare("UPDATE contas SET nome = ?, sobrenome = ?, username = ? WHERE id = ?")
-                    ->execute([$dados['nome'], $dados['sobrenome'], $dados['username'], $id]);
+                // Se a conta estava como 'criada', volta para 'pendente' para ser recriada
+                if ($conta['status'] === 'criada') {
+                    $pdo->prepare("UPDATE contas SET nome = ?, sobrenome = ?, username = ?, status = 'pendente' WHERE id = ?")
+                        ->execute([$dados['nome'], $dados['sobrenome'], $dados['username'], $id]);
+                } else {
+                    $pdo->prepare("UPDATE contas SET nome = ?, sobrenome = ?, username = ? WHERE id = ?")
+                        ->execute([$dados['nome'], $dados['sobrenome'], $dados['username'], $id]);
+                }
             }
         }
         break;
@@ -721,13 +733,19 @@ switch ($acao) {
         break;
 
     case 'regerar_todas_falhadas':
-        $contasFalhadas = $pdo->query("SELECT id, genero, pais FROM contas WHERE nome = 'User'")->fetchAll();
+        $contasFalhadas = $pdo->query("SELECT id, genero, pais, status FROM contas WHERE nome = 'User'")->fetchAll();
         if (count($contasFalhadas) > 0) {
             foreach ($contasFalhadas as $conta) {
                 $dados = gerarNomeAleatorio($conta['genero'], $conta['pais']);
                 if ($dados) {
-                    $pdo->prepare("UPDATE contas SET nome = ?, sobrenome = ?, username = ? WHERE id = ?")
-                        ->execute([$dados['nome'], $dados['sobrenome'], $dados['username'], $conta['id']]);
+                    // Se a conta estava como 'criada', volta para 'pendente' para ser recriada
+                    if ($conta['status'] === 'criada') {
+                        $pdo->prepare("UPDATE contas SET nome = ?, sobrenome = ?, username = ?, status = 'pendente' WHERE id = ?")
+                            ->execute([$dados['nome'], $dados['sobrenome'], $dados['username'], $conta['id']]);
+                    } else {
+                        $pdo->prepare("UPDATE contas SET nome = ?, sobrenome = ?, username = ? WHERE id = ?")
+                            ->execute([$dados['nome'], $dados['sobrenome'], $dados['username'], $conta['id']]);
+                    }
                 }
                 usleep(150000); // delay de 150ms para evitar rate limit
             }
