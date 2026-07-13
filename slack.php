@@ -326,7 +326,11 @@ $listas = $pdo->query("SELECT * FROM slack_listas ORDER BY criado_em DESC")->fet
                 </div>
             </div>
             
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-3 flex-wrap justify-end">
+                <a href="forcar_lote_slack.php" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-purple-100 text-purple-800 dark:bg-purple-950/30 dark:text-purple-400 border border-purple-200 dark:border-purple-800 hover:bg-purple-200 dark:hover:bg-purple-900/40 transition">
+                    <i data-lucide="zap" class="w-3.5 h-3.5"></i>
+                    Forçar Lote Parcial
+                </a>
                 <?php if ($conexao_ok): ?>
                     <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
                         <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
