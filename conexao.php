@@ -181,6 +181,18 @@ try {
             `texto` TEXT NOT NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
+        // 8. Coluna slack_sync no log imutável de criação
+        try {
+            $logCols = array_column($pdo->query("SHOW COLUMNS FROM log_criacao_contas")->fetchAll(), 'Field');
+            if (!in_array('slack_sync', $logCols)) {
+                $pdo->query("ALTER TABLE log_criacao_contas ADD COLUMN slack_sync TINYINT(1) NOT NULL DEFAULT 0");
+                // Migração: marcar como sincronizados os logs de contas já reportadas ao Slack
+                $pdo->query("UPDATE log_criacao_contas l INNER JOIN contas c ON c.id = l.conta_id SET l.slack_sync = 1 WHERE c.slack_perfil_sync = 1");
+                // Marcar como sincronizados os logs de contas deletadas (não rastreavais)
+                $pdo->query("UPDATE log_criacao_contas l LEFT JOIN contas c ON c.id = l.conta_id SET l.slack_sync = 1 WHERE c.id IS NULL");
+            }
+        } catch (Exception $e) {}
+
     } catch (Exception $e) {
         // Silenciar erro em produção ou logar
     }
@@ -480,64 +492,55 @@ if (!function_exists('sincronizarSlackTracker')) {
 
             if (!$week_row_id) return;
 
-            // 5. Contar e sincronizar Lotes de 50 Perfis Criados
-            $contasUnsynced = $pdo->query("SELECT id, email FROM contas WHERE status IN ('criada', 'autenticada', 'exportado') AND slack_perfil_sync = 0 ORDER BY id ASC")->fetchAll();
-            
-            $perfisPorDominio = [];
-            foreach ($contasUnsynced as $c) {
-                $domainEmail = strtolower(trim(explode('@', $c['email'])[1] ?? ''));
-                $domName = strtolower(explode('.', $domainEmail)[0] ?? 'dollfinn');
-                if (empty($domName)) $domName = 'dollfinn';
-                $perfisPorDominio[$domName][] = $c['id'];
-            }
+            // 5. Contar e sincronizar Lotes de 50 Perfis via log imutatvel de criação
+            $pendingLogCount = (int) $pdo->query("SELECT COUNT(*) FROM log_criacao_contas WHERE slack_sync = 0")->fetchColumn();
 
-            foreach ($perfisPorDominio as $domName => $idsDaZone) {
-                $totalZone = count($idsDaZone);
-                if ($totalZone >= 50) {
-                    // Obter count acumulado de lotes para este domínio (independente de semana ou lista)
-                    $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM slack_lotes_count WHERE domain = ? AND type = 'perfil'");
-                    $stmtCount->execute([$domName]);
-                    $loteCount = (int) $stmtCount->fetchColumn();
+            if ($pendingLogCount >= 50) {
+                $loteText = "50 perfis criados {$nomeDominio}";
+                $hoje = date('Y-m-d');
 
-                    $loteText = "50 perfis criados {$domName}";
-                    $hoje = date('Y-m-d');
+                // Buscar os 50 IDs mais antigos do log não sincronizados
+                $pendingLogIds = array_column(
+                    $pdo->query("SELECT id FROM log_criacao_contas WHERE slack_sync = 0 ORDER BY id ASC LIMIT 50")->fetchAll(),
+                    'id'
+                );
 
-                    $chSub = curl_init("https://slack.com/api/slackLists.items.create");
-                    curl_setopt($chSub, CURLOPT_RETURNTRANSFER, true);
-                    curl_setopt($chSub, CURLOPT_POST, true);
-                    curl_setopt($chSub, CURLOPT_HTTPHEADER, [
-                        "Authorization: Bearer " . $token,
-                        "Content-Type: application/json; charset=utf-8"
-                    ]);
-                    curl_setopt($chSub, CURLOPT_POSTFIELDS, json_encode([
-                        "list_id" => $list_id,
-                        "parent_item_id" => $week_row_id,
-                        "initial_fields" => [
-                            [
-                                "column_id" => $primary_col_id,
-                                "rich_text" => buildRichText($loteText)
-                            ],
-                            [
-                                "column_id" => "Col00",
-                                "checkbox" => true
-                            ],
-                            [
-                                "column_id" => "Col02",
-                                "date" => [$hoje]
-                            ]
+                $chSub = curl_init("https://slack.com/api/slackLists.items.create");
+                curl_setopt($chSub, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($chSub, CURLOPT_POST, true);
+                curl_setopt($chSub, CURLOPT_HTTPHEADER, [
+                    "Authorization: Bearer " . $token,
+                    "Content-Type: application/json; charset=utf-8"
+                ]);
+                curl_setopt($chSub, CURLOPT_POSTFIELDS, json_encode([
+                    "list_id" => $list_id,
+                    "parent_item_id" => $week_row_id,
+                    "initial_fields" => [
+                        [
+                            "column_id" => $primary_col_id,
+                            "rich_text" => buildRichText($loteText)
+                        ],
+                        [
+                            "column_id" => "Col00",
+                            "checkbox" => true
+                        ],
+                        [
+                            "column_id" => "Col02",
+                            "date" => [$hoje]
                         ]
-                    ]));
-                    $subRes = json_decode(curl_exec($chSub), true);
-                    curl_close($chSub);
+                    ]
+                ]));
+                $subRes = json_decode(curl_exec($chSub), true);
+                curl_close($chSub);
 
-                    if ($subRes && isset($subRes['ok']) && $subRes['ok']) {
-                        // Registra que um novo lote foi criado
-                        $pdo->prepare("INSERT INTO slack_lotes_count (list_id, week, type, domain) VALUES (?, ?, ?, ?)")->execute([$list_id, $week_title, 'perfil', $domName]);
+                if ($subRes && isset($subRes['ok']) && $subRes['ok']) {
+                    // Registra o lote
+                    $pdo->prepare("INSERT INTO slack_lotes_count (list_id, week, type, domain) VALUES (?, ?, ?, ?)")
+                        ->execute([$list_id, $week_title, 'perfil', $nomeDominio]);
 
-                        $idsToUpdate = array_slice($idsDaZone, 0, 50);
-                        $in = str_repeat('?,', count($idsToUpdate) - 1) . '?';
-                        $pdo->prepare("UPDATE contas SET slack_perfil_sync = 1 WHERE id IN ($in)")->execute($idsToUpdate);
-                    }
+                    // Marca as 50 entradas do log como sincronizadas
+                    $inLog = implode(',', array_map('intval', $pendingLogIds));
+                    $pdo->query("UPDATE log_criacao_contas SET slack_sync = 1 WHERE id IN ({$inLog})");
                 }
             }
 

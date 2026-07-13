@@ -122,17 +122,26 @@ if ($forcar && $confirmar) {
         echo "<p class='text-emerald-400'>✅ Linha da semana já existe no Slack.</p>";
     }
 
-    // 4. Contas não sincronizadas por domínio
+    // 4. Logs de criação não sincronizados por domínio
     $contasUnsynced = $pdo->query(
-        "SELECT id, email FROM contas WHERE status IN ('criada', 'autenticada', 'exportado') AND slack_perfil_sync = 0 ORDER BY id ASC"
+        "SELECT l.id, c.email FROM log_criacao_contas l 
+         LEFT JOIN contas c ON c.id = l.conta_id 
+         WHERE l.slack_sync = 0 ORDER BY l.id ASC"
     )->fetchAll();
 
     $perfisPorDominio = [];
     foreach ($contasUnsynced as $c) {
-        $domainEmail = strtolower(trim(explode('@', $c['email'])[1] ?? ''));
+        $email = $c['email'] ?? '';
+        $domainEmail = '';
+        if (!empty($email)) {
+            $domainEmail = strtolower(trim(explode('@', $email)[1] ?? ''));
+        }
+        if (empty($domainEmail)) {
+            $domainEmail = $nomeDominio;
+        }
         $domName = strtolower(explode('.', $domainEmail)[0] ?? 'dollfinn');
         if (empty($domName)) $domName = 'dollfinn';
-        $perfisPorDominio[$domName][] = $c['id'];
+        $perfisPorDominio[$domName][] = $c['id']; // Armazena o ID do log
     }
 
     $totalPendente = count($contasUnsynced);
@@ -189,11 +198,11 @@ if ($forcar && $confirmar) {
             $pdo->prepare("INSERT INTO slack_lotes_count (list_id, week, type, domain) VALUES (?, ?, ?, ?)")
                 ->execute([$list_id, $week_title, 'perfil', $domName]);
 
-            // Marcar todas as contas como sincronizadas
-            $in = str_repeat('?,', count($idsDaZone) - 1) . '?';
-            $pdo->prepare("UPDATE contas SET slack_perfil_sync = 1 WHERE id IN ($in)")->execute($idsDaZone);
+            // Marcar logs de criação como sincronizados
+            $in = implode(',', array_map('intval', $idsDaZone));
+            $pdo->query("UPDATE log_criacao_contas SET slack_sync = 1 WHERE id IN ($in)");
 
-            echo "<p class='text-emerald-400 pl-4'>✅ Lote enviado e {$totalZone} conta(s) marcadas como sincronizadas!</p>";
+            echo "<p class='text-emerald-400 pl-4'>✅ Lote enviado e {$totalZone} log(s) de criação marcados como sincronizados!</p>";
             $lotesEnviados++;
         } else {
             $err = $subRes['error'] ?? 'Erro desconhecido';
@@ -212,14 +221,23 @@ if ($forcar && $confirmar) {
 //  TELA DE DIAGNÓSTICO / CONFIRMAÇÃO
 // ========================
 
-// Buscar dados para exibir
+// Buscar dados para exibir do log de criacao
 $contasUnsynced = $pdo->query(
-    "SELECT id, email FROM contas WHERE status IN ('criada', 'autenticada', 'exportado') AND slack_perfil_sync = 0 ORDER BY id ASC"
+    "SELECT l.id, c.email FROM log_criacao_contas l 
+     LEFT JOIN contas c ON c.id = l.conta_id 
+     WHERE l.slack_sync = 0 ORDER BY l.id ASC"
 )->fetchAll();
 
 $perfisPorDominio = [];
 foreach ($contasUnsynced as $c) {
-    $domainEmail = strtolower(trim(explode('@', $c['email'])[1] ?? ''));
+    $email = $c['email'] ?? '';
+    $domainEmail = '';
+    if (!empty($email)) {
+        $domainEmail = strtolower(trim(explode('@', $email)[1] ?? ''));
+    }
+    if (empty($domainEmail)) {
+        $domainEmail = 'dollfinn'; // fallback padrao
+    }
     $domName = strtolower(explode('.', $domainEmail)[0] ?? 'dollfinn');
     if (empty($domName)) $domName = 'dollfinn';
     $perfisPorDominio[$domName][] = $c['id'];
@@ -339,9 +357,9 @@ $week_title = obterSemanaDoMes(time());
                 <i data-lucide="alert-triangle" class="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5"></i>
                 <div>
                     <div class="font-bold text-amber-300 text-sm">Atenção: Lote Parcial</div>
-                    <p class="text-xs text-slate-400 mt-1">
-                        Ao forçar, o lote será enviado com <strong class="text-white"><?= count($contasUnsynced) ?> contas</strong>
-                        ao invés de 50. Isso irá registrar o lote no banco e marcar as contas como sincronizadas.
+                    <p class="text-xs text-slate-400 mt-1 font-medium">
+                        Ao forçar, o lote será enviado com <strong class="text-white"><?= count($contasUnsynced) ?> contas registradas no log</strong>
+                        ao invés de 50. Isso irá registrar o lote no banco e marcar os logs como sincronizados no Slack.
                         O próximo lote automático irá continuar a numeração normalmente a partir do ponto seguinte.
                     </p>
                 </div>

@@ -120,16 +120,8 @@ if (strpos($email_dominio, '@') !== 0) {
     $email_dominio = '@' . $email_dominio;
 }
 
-// Contador de contas pendentes para o próximo lote Slack — filtra pelo domínio principal configurado
-$dominioConf = strtolower(ltrim($config['email_dominio'] ?? 'dollfinn', '@'));
-$stmtNaoSync = $pdo->prepare("
-    SELECT COUNT(*) FROM contas 
-    WHERE status IN ('criada','autenticada','exportado') 
-    AND slack_perfil_sync = 0
-    AND email LIKE ?
-");
-$stmtNaoSync->execute(['%@' . $dominioConf]);
-$contasNaoSync = (int) $stmtNaoSync->fetchColumn();
+// Contador baseado no log imutável de criação (não muda se contas forem deletadas)
+$contasNaoSync = (int) $pdo->query("SELECT COUNT(*) FROM log_criacao_contas WHERE slack_sync = 0")->fetchColumn();
 
 // Quantas faltam para completar o próximo lote de 50 (sempre exibido)
 $faltamParaSlack = ($contasNaoSync === 0) ? 50 : (50 - ($contasNaoSync % 50));
