@@ -120,6 +120,27 @@ if (strpos($email_dominio, '@') !== 0) {
     $email_dominio = '@' . $email_dominio;
 }
 
+// Contador de contas pendentes para o próximo lote Slack (acumulativo, por domínio principal)
+$dominioConf = strtolower(ltrim($config['email_dominio'] ?? 'dollfinn', '@'));
+$nomeDominioConf = strtolower(explode('.', $dominioConf)[0] ?? 'dollfinn');
+if (empty($nomeDominioConf)) $nomeDominioConf = 'dollfinn';
+
+$stmtNaoSync = $pdo->prepare("
+    SELECT COUNT(*) FROM contas 
+    WHERE status IN ('criada','autenticada','exportado') 
+    AND slack_perfil_sync = 0 
+    AND LOWER(SUBSTRING_INDEX(email, '@', -1)) LIKE ?
+");
+$stmtNaoSync->execute([$dominioConf . '%']);
+$contasNaoSync = (int) $stmtNaoSync->fetchColumn();
+
+// Quantas faltam para completar o próximo lote de 50
+$faltamParaSlack = ($contasNaoSync === 0) ? 50 : (50 - ($contasNaoSync % 50));
+if ($faltamParaSlack === 50 && $contasNaoSync > 0) {
+    // Múltiplo exato de 50: o lote já deveria ter sido disparado
+    $faltamParaSlack = 0;
+}
+
 
 
 // Listagem
@@ -308,9 +329,17 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
                     <p class="text-slate-500 text-sm font-semibold uppercase tracking-wider">Criadas na Semana</p>
                     <h3 class="text-3xl font-black mt-1"><?= $contasCriadasSemana ?></h3>
                     <p class="text-xs text-slate-400 mt-1 font-medium"><span class="text-green-600 dark:text-green-400 font-bold"><?= $contasCriadasHoje ?></span> hoje</p>
+                    <?php if ($contasNaoSync > 0 && $faltamParaSlack > 0): ?>
+                    <p class="text-xs text-slate-400 mt-1 font-medium">
+                        <span style="color:#ef4444;font-weight:800;font-size:0.7rem;background:rgba(239,68,68,0.1);padding:1px 5px;border-radius:6px;border:1px solid rgba(239,68,68,0.25);" title="Faltam para notificar no Slack"><?= $faltamParaSlack ?> p/ Slack</span>
+                    </p>
+                    <?php endif; ?>
                 </div>
-                <div class="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-2xl flex items-center justify-center text-green-600 dark:text-green-400">
+                <div class="relative w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-2xl flex items-center justify-center text-green-600 dark:text-green-400">
                     <i data-lucide="trending-up" class="w-6 h-6"></i>
+                    <?php if ($contasNaoSync > 0 && $faltamParaSlack > 0): ?>
+                    <span style="position:absolute;top:-5px;right:-5px;background:#ef4444;color:#fff;font-size:0.6rem;font-weight:900;min-width:16px;height:16px;border-radius:9999px;display:flex;align-items:center;justify-content:center;padding:0 3px;border:2px solid white;box-shadow:0 1px 4px rgba(239,68,68,0.5);line-height:1;" title="Faltam <?= $faltamParaSlack ?> contas para notificar no Slack"><?= $faltamParaSlack ?></span>
+                    <?php endif; ?>
                 </div>
             </div>
             <div class="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
