@@ -14,36 +14,40 @@ if ($quantidade < 1 || $quantidade > 500) $quantidade = 100;
 if ($executar && $confirmar) {
     header('Content-Type: text/html; charset=utf-8');
     echo "<!DOCTYPE html><html lang='pt-BR'><head><meta charset='UTF-8'><title>Remover Contas de Teste</title><script src='tailwind.js?v=1'></script><link href='https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap' rel='stylesheet'><style>body{font-family:'Inter',sans-serif;}</style></head><body class='bg-slate-950 text-slate-100 p-8 space-y-3 font-mono text-sm'>";
-    echo "<h1 class='text-2xl font-extrabold mb-6 text-red-400'>🗑️ Removendo {$quantidade} contas de teste...</h1>";
+    echo "<h1 class='text-2xl font-extrabold mb-6 text-red-400'>🗑️ Removendo {$quantidade} logs/contas de teste...</h1>";
 
-    // Buscar os IDs das últimas N contas (pelo ID mais alto, que são as mais recentes)
-    $stmtIds = $pdo->prepare("
-        SELECT id FROM contas 
+    // Buscar os registros do log_criacao_contas mais recentes
+    $stmtLogs = $pdo->prepare("
+        SELECT id, conta_id FROM log_criacao_contas 
         ORDER BY id DESC 
         LIMIT ?
     ");
-    $stmtIds->execute([$quantidade]);
-    $ids = array_column($stmtIds->fetchAll(), 'id');
+    $stmtLogs->execute([$quantidade]);
+    $logsData = $stmtLogs->fetchAll();
 
-    if (empty($ids)) {
-        echo "<p class='text-yellow-400'>⚠️ Nenhuma conta encontrada para remover.</p></body></html>";
+    if (empty($logsData)) {
+        echo "<p class='text-yellow-400'>⚠️ Nenhum log de criação encontrado para remover.</p></body></html>";
         exit;
     }
 
-    echo "<p class='text-slate-400'>IDs encontrados: <span class='text-white font-bold'>" . min($ids) . " até " . max($ids) . " (" . count($ids) . " contas)</span></p>";
+    $logIds = array_column($logsData, 'id');
+    $contaIds = array_filter(array_column($logsData, 'conta_id'));
 
-    $in = str_repeat('?,', count($ids) - 1) . '?';
+    echo "<p class='text-slate-400'>Logs encontrados: <span class='text-white font-bold'>" . min($logIds) . " até " . max($logIds) . " (" . count($logIds) . " registros)</span></p>";
 
     // 1. Remover do log_criacao_contas
-    $stmtLog = $pdo->prepare("DELETE FROM log_criacao_contas WHERE conta_id IN ($in)");
-    $stmtLog->execute($ids);
-    $logRemovidos = $stmtLog->rowCount();
+    $inLogs = implode(',', array_map('intval', $logIds));
+    $pdo->query("DELETE FROM log_criacao_contas WHERE id IN ($inLogs)");
+    $logRemovidos = count($logIds);
     echo "<p class='text-yellow-400'>📋 Registros removidos do log_criacao_contas: <span class='font-bold text-white'>{$logRemovidos}</span></p>";
 
     // 2. Remover da tabela contas
-    $stmtDel = $pdo->prepare("DELETE FROM contas WHERE id IN ($in)");
-    $stmtDel->execute($ids);
-    $contasRemovidas = $stmtDel->rowCount();
+    $contasRemovidas = 0;
+    if (!empty($contaIds)) {
+        $inContas = implode(',', array_map('intval', $contaIds));
+        $stmtDel = $pdo->query("DELETE FROM contas WHERE id IN ($inContas)");
+        $contasRemovidas = $stmtDel->rowCount();
+    }
     echo "<p class='text-red-400'>🗑️ Contas removidas da tabela contas: <span class='font-bold text-white'>{$contasRemovidas}</span></p>";
 
     echo "<hr class='border-slate-700 my-4'>";
@@ -60,24 +64,19 @@ if ($executar && $confirmar) {
 // TELA DE CONFIRMAÇÃO
 // ========================
 
-// Preview: quais contas seriam removidas
+// Preview: quais logs e contas relacionadas serão deletados
 $stmtPreview = $pdo->prepare("
-    SELECT id, email, status, slack_perfil_sync, data_criacao 
-    FROM contas 
-    ORDER BY id DESC 
+    SELECT l.id AS log_id, l.criado_em AS log_criado_em, c.id AS conta_id, c.email, c.status, c.slack_perfil_sync
+    FROM log_criacao_contas l
+    LEFT JOIN contas c ON c.id = l.conta_id
+    ORDER BY l.id DESC
     LIMIT ?
 ");
 $stmtPreview->execute([$quantidade]);
 $preview = $stmtPreview->fetchAll();
 
-// Contar registros de log que seriam removidos
-$previewIds = array_column($preview, 'id');
-$logCount = 0;
-if (!empty($previewIds)) {
-    $inP = str_repeat('?,', count($previewIds) - 1) . '?';
-    $logCount = (int) $pdo->prepare("SELECT COUNT(*) FROM log_criacao_contas WHERE conta_id IN ($inP)")
-        ->execute($previewIds) ? $pdo->query("SELECT COUNT(*) FROM log_criacao_contas WHERE conta_id IN (" . implode(',', $previewIds) . ")")->fetchColumn() : 0;
-}
+$logCount = count($preview);
+
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -156,11 +155,11 @@ if (!empty($previewIds)) {
                     <tbody>
                         <?php foreach ($preview as $c): ?>
                         <tr class="border-t border-slate-800 text-slate-300">
-                            <td class="px-4 py-1.5 font-mono"><?= $c['id'] ?></td>
-                            <td class="px-4 py-1.5 font-mono truncate max-w-[200px]"><?= htmlspecialchars($c['email']) ?></td>
-                            <td class="px-4 py-1.5"><?= htmlspecialchars($c['status']) ?></td>
+                            <td class="px-4 py-1.5 font-mono"><?= $c['log_id'] ?></td>
+                            <td class="px-4 py-1.5 font-mono truncate max-w-[200px]"><?= htmlspecialchars($c['email'] ?? 'Conta excluída') ?></td>
+                            <td class="px-4 py-1.5"><?= htmlspecialchars($c['status'] ?? 'N/A') ?></td>
                             <td class="px-4 py-1.5 <?= $c['slack_perfil_sync'] ? 'text-emerald-400' : 'text-slate-500' ?>"><?= $c['slack_perfil_sync'] ? '✅ sim' : '— não' ?></td>
-                            <td class="px-4 py-1.5 text-slate-400"><?= $c['data_criacao'] ?></td>
+                            <td class="px-4 py-1.5 text-slate-400"><?= $c['log_criado_em'] ?></td>
                         </tr>
                         <?php endforeach; ?>
                     </tbody>
