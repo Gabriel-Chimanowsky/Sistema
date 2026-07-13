@@ -152,9 +152,7 @@ if ($forcar && $confirmar) {
         $stmtCount->execute([$domName]);
         $loteCount = (int) $stmtCount->fetchColumn();
 
-        $startRange = ($loteCount * 50) + 1;
-        $endRange = $startRange + $totalZone - 1; // Até onde realmente foi
-        $loteText = "{$startRange} - {$endRange} perfis {$domName} (lote parcial)";
+        $loteText = "50 perfis criados {$domName}";
 
         echo "<p class='text-slate-400 pl-4'>→ Próximo lote: <span class='text-yellow-400'>{$loteText}</span></p>";
 

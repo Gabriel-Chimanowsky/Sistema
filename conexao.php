@@ -499,9 +499,7 @@ if (!function_exists('sincronizarSlackTracker')) {
                     $stmtCount->execute([$domName]);
                     $loteCount = (int) $stmtCount->fetchColumn();
 
-                    $startRange = ($loteCount * 50) + 1;
-                    $endRange = ($loteCount + 1) * 50;
-                    $loteText = "{$startRange} - {$endRange} perfis {$domName}";
+                    $loteText = "50 perfis criados {$domName}";
                     $hoje = date('Y-m-d');
 
                     $chSub = curl_init("https://slack.com/api/slackLists.items.create");
@@ -562,9 +560,7 @@ if (!function_exists('sincronizarSlackTracker')) {
                     $stmtCountBm->execute([$domName]);
                     $loteCountBm = (int) $stmtCountBm->fetchColumn();
 
-                    $startRangeBm = ($loteCountBm * 50) + 1;
-                    $endRangeBm = ($loteCountBm + 1) * 50;
-                    $loteTextBm = "{$startRangeBm} - {$endRangeBm} BMs {$domName}";
+                    $loteTextBm = "50 BMs criadas {$domName}";
                     $hoje = date('Y-m-d');
 
                     $chSub = curl_init("https://slack.com/api/slackLists.items.create");
