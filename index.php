@@ -131,7 +131,9 @@ $stmtNaoSync = $pdo->prepare("
 $stmtNaoSync->execute(['%@' . $dominioConf]);
 $contasNaoSync = (int) $stmtNaoSync->fetchColumn();
 
-
+// Quantas faltam para completar o próximo lote de 50 (sempre exibido)
+$faltamParaSlack = ($contasNaoSync === 0) ? 50 : (50 - ($contasNaoSync % 50));
+if ($faltamParaSlack === 50 && $contasNaoSync > 0) $faltamParaSlack = 0;
 
 // Listagem
 $sort = $_GET['sort'] ?? 'id';
@@ -319,16 +321,21 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
                     <p class="text-slate-500 text-sm font-semibold uppercase tracking-wider">Criadas na Semana</p>
                     <h3 class="text-3xl font-black mt-1"><?= $contasCriadasSemana ?></h3>
                     <p class="text-xs text-slate-400 mt-1 font-medium"><span class="text-green-600 dark:text-green-400 font-bold"><?= $contasCriadasHoje ?></span> hoje</p>
-                    <?php if ($contasNaoSync > 0): ?>
+                    <?php
+                        $slackCor = ($contasNaoSync === 0) ? '#22c55e' : '#ef4444';
+                        $slackBg  = ($contasNaoSync === 0) ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)';
+                        $slackBorder = ($contasNaoSync === 0) ? 'rgba(34,197,94,0.25)' : 'rgba(239,68,68,0.25)';
+                        $slackLabel = ($contasNaoSync === 0) ? "50 p/ Slack" : "{$faltamParaSlack} p/ Slack";
+                        $slackTitle = ($contasNaoSync === 0) ? 'Pronto! Precisa de 50 novas para o próximo lote' : "Faltam {$faltamParaSlack} contas para notificar no Slack ({$contasNaoSync} pendentes)";
+                    ?>
                     <p class="text-xs text-slate-400 mt-1 font-medium">
-                        <span style="color:#ef4444;font-weight:800;font-size:0.7rem;background:rgba(239,68,68,0.1);padding:1px 5px;border-radius:6px;border:1px solid rgba(239,68,68,0.25);" title="Contas aguardando envio ao Slack"><?= $contasNaoSync ?> p/ Slack</span>
+                        <span style="color:<?= $slackCor ?>;font-weight:800;font-size:0.7rem;background:<?= $slackBg ?>;padding:1px 5px;border-radius:6px;border:1px solid <?= $slackBorder ?>;" title="<?= $slackTitle ?>"><?= $slackLabel ?></span>
                     </p>
-                    <?php endif; ?>
                 </div>
                 <div class="relative w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-2xl flex items-center justify-center text-green-600 dark:text-green-400">
                     <i data-lucide="trending-up" class="w-6 h-6"></i>
                     <?php if ($contasNaoSync > 0): ?>
-                    <span style="position:absolute;top:-5px;right:-5px;background:#ef4444;color:#fff;font-size:0.6rem;font-weight:900;min-width:16px;height:16px;border-radius:9999px;display:flex;align-items:center;justify-content:center;padding:0 3px;border:2px solid white;box-shadow:0 1px 4px rgba(239,68,68,0.5);line-height:1;" title="<?= $contasNaoSync ?> contas aguardando sync no Slack"><?= $contasNaoSync ?></span>
+                    <span style="position:absolute;top:-5px;right:-5px;background:#ef4444;color:#fff;font-size:0.6rem;font-weight:900;min-width:16px;height:16px;border-radius:9999px;display:flex;align-items:center;justify-content:center;padding:0 3px;border:2px solid white;box-shadow:0 1px 4px rgba(239,68,68,0.5);line-height:1;" title="Faltam <?= $faltamParaSlack ?> contas para notificar no Slack"><?= $faltamParaSlack ?></span>
                     <?php endif; ?>
                 </div>
             </div>
