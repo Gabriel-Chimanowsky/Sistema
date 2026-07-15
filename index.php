@@ -224,8 +224,11 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
             .glass-nav { background: rgba(15, 23, 42, 0.95) !important; border-bottom: 1px solid rgba(255,255,255,0.1) !important; }
             .bg-white\/95 { background-color: rgba(15, 23, 42, 0.98) !important; }
         }
-        .tr-hover:hover { background-color: rgba(59, 130, 246, 0.02); }
-        .dark .tr-hover:hover { background-color: rgba(59, 130, 246, 0.05); }
+        .tr-hover { cursor: pointer; }
+        .tr-hover:hover { background-color: rgba(59, 130, 246, 0.04); }
+        .dark .tr-hover:hover { background-color: rgba(59, 130, 246, 0.07); }
+        .tr-hover.row-selected { background-color: rgba(59, 130, 246, 0.08) !important; }
+        .dark .tr-hover.row-selected { background-color: rgba(59, 130, 246, 0.13) !important; }
 
         /* ---- Mobile safe-area ---- */
         .footer-bar {
@@ -249,9 +252,12 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
             flex-direction: column;
             gap: 0.625rem;
             box-shadow: 0 1px 3px rgba(0,0,0,.06);
-            transition: box-shadow 0.2s;
+            transition: box-shadow 0.2s, border-color 0.2s;
+            cursor: pointer;
         }
         .mobile-card:active { box-shadow: 0 0 0 3px rgba(59,130,246,.15); }
+        .mobile-card.card-selected { border-color: rgba(59,130,246,.5) !important; box-shadow: 0 0 0 2px rgba(59,130,246,.2); }
+        @media (prefers-color-scheme: dark) { .mobile-card.card-selected { border-color: rgba(59,130,246,.6) !important; } }
         @media (prefers-color-scheme: dark) {
             .mobile-card { background: #0f172a; border-color: #1e293b; }
         }
@@ -1176,7 +1182,7 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
         // ── Ações em Lote ─────────────────────────────────────────────
         function getSelecionados() {
             return [...document.querySelectorAll('.check-conta:checked')]
-                .map(c => c.closest('tr[data-id]')?.dataset.id)
+                .map(c => (c.closest('tr[data-id]') || c.closest('[data-id]'))?.dataset.id)
                 .filter(Boolean);
         }
 
@@ -1481,6 +1487,55 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
         // Mobile card checkboxes also trigger batch bar
         document.querySelectorAll('.mobile-cards-wrap .check-conta').forEach(cb => {
             cb.addEventListener('change', atualizarBarraLote);
+        });
+
+        // ── Seleção por clique no fundo da linha / card ───────────────
+        const INTERACTIVE = 'button, a, input, select, textarea, label, [onclick], form';
+
+        function toggleRowSelection(container, checkbox) {
+            checkbox.checked = !checkbox.checked;
+            // Atualiza visual da linha/card
+            const isTr = container.tagName === 'TR';
+            if (isTr) {
+                container.classList.toggle('row-selected', checkbox.checked);
+            } else {
+                container.classList.toggle('card-selected', checkbox.checked);
+            }
+            // Dispara change para atualizar a barra de lote
+            checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
+        function rowClickHandler(e) {
+            // Ignora se o clique veio de (ou passou por) um elemento interativo
+            if (e.target.closest(INTERACTIVE)) return;
+            const container = e.currentTarget;
+            const checkbox = container.querySelector('.check-conta');
+            if (!checkbox) return;
+            toggleRowSelection(container, checkbox);
+        }
+
+        // Tabela desktop: cada <tr>
+        document.querySelectorAll('tr.tr-hover').forEach(tr => {
+            tr.addEventListener('click', rowClickHandler);
+        });
+
+        // Cards mobile
+        document.querySelectorAll('.mobile-card').forEach(card => {
+            card.addEventListener('click', rowClickHandler);
+        });
+
+        // Sincronizar visual ao marcar/desmarcar qualquer checkbox (inclusive selectAll)
+        document.addEventListener('change', e => {
+            if (e.target.classList.contains('check-conta')) {
+                const tr   = e.target.closest('tr.tr-hover');
+                const card = e.target.closest('.mobile-card');
+                if (tr)   tr.classList.toggle('row-selected',  e.target.checked);
+                if (card) card.classList.toggle('card-selected', e.target.checked);
+            }
+            if (e.target.id === 'selectAll') {
+                const checked = e.target.checked;
+                document.querySelectorAll('tr.tr-hover').forEach(tr => tr.classList.toggle('row-selected', checked));
+            }
         });
     </script>
 </body>
