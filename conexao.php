@@ -193,6 +193,17 @@ try {
             }
         } catch (Exception $e) {}
 
+        // 9. Tabela cloudflare_dominios (rotação automática de domínios de email)
+        $pdo->query("CREATE TABLE IF NOT EXISTS `cloudflare_dominios` (
+            `id` INT AUTO_INCREMENT PRIMARY KEY,
+            `prefixo` VARCHAR(100) NOT NULL DEFAULT 'conta',
+            `dominio` VARCHAR(100) NOT NULL,
+            `contador` INT NOT NULL DEFAULT 1,
+            `ativo` TINYINT(1) NOT NULL DEFAULT 0,
+            `esgotado` TINYINT(1) NOT NULL DEFAULT 0,
+            `criado_em` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
     } catch (Exception $e) {
         // Silenciar erro em produção ou logar
     }

@@ -10,6 +10,10 @@ if (isFinanceiro()) {
 
 $stmt = $pdo->query("SELECT * FROM configuracoes LIMIT 1");
 $config = $stmt->fetch();
+
+// Carregar domínios cadastrados para geração de contas
+$stmtDoms = $pdo->query("SELECT * FROM cloudflare_dominios ORDER BY id ASC");
+$cfDominios = $stmtDoms ? $stmtDoms->fetchAll() : [];
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -318,6 +322,160 @@ $config = $stmt->fetch();
 
             </div>
 
+        </div>
+
+    </div>
+
+        <!-- Seção: Domínios para Rotação Automática de Email -->
+        <div class="mt-8">
+            <div class="bg-white dark:bg-slate-900 rounded-[2rem] p-6 border border-slate-200 dark:border-slate-800 shadow-xl space-y-6">
+                <div class="flex items-center gap-3 border-b border-slate-100 dark:border-slate-800/80 pb-3">
+                    <span class="w-7 h-7 bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 rounded-lg flex items-center justify-center text-xs font-black">05</span>
+                    <div>
+                        <h2 class="font-extrabold text-base">Domínios para Geração de Contas</h2>
+                        <p class="text-[11px] text-slate-400 font-medium mt-0.5">Quando um domínio atingir 200 e-mails, o próximo será ativado automaticamente.</p>
+                    </div>
+                    <?php
+                    $totalDoms = count($cfDominios);
+                    $esgotados = array_filter($cfDominios, fn($d) => $d['esgotado'] == 1);
+                    $ativos = array_filter($cfDominios, fn($d) => $d['ativo'] == 1);
+                    $livres = array_filter($cfDominios, fn($d) => $d['esgotado'] == 0 && $d['ativo'] == 0);
+                    ?>
+                    <div class="ml-auto flex items-center gap-3">
+                        <div class="text-center">
+                            <span class="block text-xs font-black text-slate-700 dark:text-slate-200"><?= $totalDoms ?></span>
+                            <span class="text-[9px] font-bold text-slate-400 uppercase">Total</span>
+                        </div>
+                        <div class="text-center">
+                            <span class="block text-xs font-black text-emerald-500"><?= count($ativos) ?></span>
+                            <span class="text-[9px] font-bold text-emerald-400 uppercase">Ativo</span>
+                        </div>
+                        <div class="text-center">
+                            <span class="block text-xs font-black text-amber-500"><?= count($livres) ?></span>
+                            <span class="text-[9px] font-bold text-amber-400 uppercase">Livre</span>
+                        </div>
+                        <div class="text-center">
+                            <span class="block text-xs font-black text-rose-500"><?= count($esgotados) ?></span>
+                            <span class="text-[9px] font-bold text-rose-400 uppercase">Esgotado</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabela de domínios -->
+                <?php if (count($cfDominios) > 0): ?>
+                <div class="overflow-x-auto rounded-2xl border border-slate-100 dark:border-slate-800">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-slate-50 dark:bg-slate-800/50 text-[10px] font-black uppercase tracking-wider text-slate-500">
+                            <tr>
+                                <th class="px-4 py-3">Domínio</th>
+                                <th class="px-4 py-3">Prefixo</th>
+                                <th class="px-4 py-3 text-center">Contador</th>
+                                <th class="px-4 py-3 text-center">Status</th>
+                                <th class="px-4 py-3 text-center">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                            <?php foreach ($cfDominios as $dom): ?>
+                            <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition">
+                                <td class="px-4 py-3 font-mono font-bold text-slate-700 dark:text-slate-200">
+                                    <?= htmlspecialchars($dom['dominio']) ?>
+                                </td>
+                                <td class="px-4 py-3 text-slate-500 font-mono">
+                                    <?= htmlspecialchars($dom['prefixo']) ?>
+                                </td>
+                                <td class="px-4 py-3 text-center">
+                                    <span class="font-black <?= $dom['contador'] >= 190 ? 'text-rose-500' : ($dom['contador'] >= 150 ? 'text-amber-500' : 'text-slate-700 dark:text-slate-300') ?>">
+                                        <?= $dom['contador'] ?>/200
+                                    </span>
+                                    <div class="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 mt-1 mx-auto max-w-[80px]">
+                                        <div class="h-full rounded-full <?= $dom['esgotado'] ? 'bg-rose-500' : ($dom['contador'] >= 150 ? 'bg-amber-500' : 'bg-emerald-500') ?>" 
+                                             style="width: <?= min(100, ($dom['contador'] / 200) * 100) ?>%"></div>
+                                    </div>
+                                </td>
+                                <td class="px-4 py-3 text-center">
+                                    <?php if ($dom['ativo'] == 1): ?>
+                                        <span class="inline-flex items-center gap-1 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 text-[10px] font-black uppercase px-2 py-1 rounded-full border border-emerald-200 dark:border-emerald-800">
+                                            <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping inline-block"></span> Ativo
+                                        </span>
+                                    <?php elseif ($dom['esgotado'] == 1): ?>
+                                        <span class="inline-flex items-center gap-1 bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 text-[10px] font-black uppercase px-2 py-1 rounded-full border border-rose-200 dark:border-rose-800">
+                                            <i data-lucide="x-circle" class="w-3 h-3"></i> Esgotado
+                                        </span>
+                                    <?php else: ?>
+                                        <span class="inline-flex items-center gap-1 bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[10px] font-black uppercase px-2 py-1 rounded-full border border-slate-200 dark:border-slate-700">
+                                            <i data-lucide="clock" class="w-3 h-3"></i> Aguardando
+                                        </span>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <div class="flex items-center justify-center gap-1.5">
+                                        <!-- Ativar -->
+                                        <?php if ($dom['ativo'] == 0): ?>
+                                        <form method="POST" action="processa.php" class="inline" onsubmit="return confirm('Ativar este domínio e resetar o contador para 1?');">
+                                            <input type="hidden" name="acao" value="ativar_dominio_cf">
+                                            <input type="hidden" name="dominio_id" value="<?= $dom['id'] ?>">
+                                            <button type="submit" class="bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-black px-2 py-1 rounded-lg transition flex items-center gap-1 active:scale-95" title="Ativar este domínio">
+                                                <i data-lucide="play" class="w-3 h-3"></i> Ativar
+                                            </button>
+                                        </form>
+                                        <?php endif; ?>
+                                        <!-- Resetar -->
+                                        <?php if ($dom['esgotado'] == 1): ?>
+                                        <form method="POST" action="processa.php" class="inline" onsubmit="return confirm('Resetar este domínio para contador 1 e remover status esgotado?');">
+                                            <input type="hidden" name="acao" value="resetar_dominio_cf">
+                                            <input type="hidden" name="dominio_id" value="<?= $dom['id'] ?>">
+                                            <button type="submit" class="bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-black px-2 py-1 rounded-lg transition flex items-center gap-1 active:scale-95" title="Resetar domínio">
+                                                <i data-lucide="refresh-cw" class="w-3 h-3"></i> Resetar
+                                            </button>
+                                        </form>
+                                        <?php endif; ?>
+                                        <!-- Remover -->
+                                        <form method="POST" action="processa.php" class="inline" onsubmit="return confirm('Remover este domínio? Esta ação é irreversível.');">
+                                            <input type="hidden" name="acao" value="remover_dominio_cf">
+                                            <input type="hidden" name="dominio_id" value="<?= $dom['id'] ?>">
+                                            <button type="submit" class="bg-slate-100 hover:bg-rose-100 dark:bg-slate-800 dark:hover:bg-rose-900/20 text-rose-500 text-[10px] font-black px-2 py-1 rounded-lg transition flex items-center gap-1 active:scale-95" title="Remover domínio">
+                                                <i data-lucide="trash-2" class="w-3 h-3"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <?php else: ?>
+                <div class="text-center py-10 text-slate-400">
+                    <i data-lucide="inbox" class="w-10 h-10 mx-auto mb-3 opacity-30"></i>
+                    <p class="text-sm font-bold">Nenhum domínio cadastrado ainda.</p>
+                    <p class="text-xs mt-1">Adicione um domínio abaixo para ativar a rotação automática.</p>
+                </div>
+                <?php endif; ?>
+
+                <!-- Formulário para adicionar domínio -->
+                <div class="pt-4 border-t border-slate-100 dark:border-slate-800">
+                    <p class="text-[11px] font-black text-slate-400 uppercase tracking-wider mb-3">Adicionar Novo Domínio</p>
+                    <form method="POST" action="processa.php" class="flex items-end gap-3 flex-wrap">
+                        <input type="hidden" name="acao" value="adicionar_dominio_cf">
+                        <div class="flex-1 min-w-[120px] space-y-1">
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Prefixo</label>
+                            <input type="text" name="cf_prefixo" value="conta" placeholder="ex: conta"
+                                class="w-full bg-slate-50 dark:bg-slate-800/50 border-2 border-transparent focus:border-blue-500 focus:bg-white dark:focus:bg-slate-800 p-3 rounded-xl outline-none transition-all font-bold text-sm">
+                        </div>
+                        <div class="flex-[2] min-w-[200px] space-y-1">
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Domínio (com ou sem @)</label>
+                            <input type="text" name="cf_dominio" placeholder="ex: meunovo.com ou @meunovo.com"
+                                class="w-full bg-slate-50 dark:bg-slate-800/50 border-2 border-transparent focus:border-blue-500 focus:bg-white dark:focus:bg-slate-800 p-3 rounded-xl outline-none transition-all font-bold text-sm">
+                        </div>
+                        <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-xl font-black text-xs flex items-center gap-2 shadow-md shadow-emerald-600/20 transition active:scale-95 whitespace-nowrap">
+                            <i data-lucide="plus-circle" class="w-4 h-4"></i> Adicionar Domínio
+                        </button>
+                    </form>
+                    <p class="text-[10px] text-slate-400 mt-2">
+                        ℹ️ O domínio adicionado ficará em espera. Use o botão <strong>Ativar</strong> para torná-lo o domínio atual. Exemplo de email gerado: <span class="font-mono">conta1@meunovo.com</span>
+                    </p>
+                </div>
+            </div>
         </div>
 
     </div>
@@ -877,6 +1035,24 @@ $config = $stmt->fetch();
         // Initialize Lucide Icons & Update Summary
         lucide.createIcons();
         updateSummary();
+
+        // ── Retornos de ações de Domínios ─────────────────────────────
+        (function() {
+            const params = new URLSearchParams(window.location.search);
+            const msg = params.get('msg');
+            const msgs = {
+                dominio_adicionado: '✅ Domínio adicionado com sucesso!',
+                dominio_removido: '🗑️ Domínio removido.',
+                dominio_ativado: '✅ Domínio ativado! Contador resetado para 1.',
+                dominio_resetado: '🔄 Domínio resetado com sucesso.',
+            };
+            if (msg && msgs[msg]) {
+                setTimeout(() => mostrarToast(msgs[msg]), 300);
+                params.delete('msg');
+                const ns = params.toString();
+                window.history.replaceState({}, '', window.location.pathname + (ns ? '?' + ns : ''));
+            }
+        })();
     </script>
 </body>
 </html>

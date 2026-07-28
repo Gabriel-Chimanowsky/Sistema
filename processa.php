@@ -400,6 +400,52 @@ switch ($acao) {
 
             $emailValido = false;
             while (!$emailValido) {
+                // Verifica se o contador atingiu o limite de 200 para o domínio atual
+                if ((int)$config['email_contador'] > 200) {
+                    // Tentar rotacionar para o próximo domínio no sistema Cloudflare
+                    $stmtDomAtivo = $pdo->query("SELECT * FROM cloudflare_dominios WHERE ativo = 1 LIMIT 1");
+                    $domAtivo = $stmtDomAtivo ? $stmtDomAtivo->fetch() : false;
+
+                    if ($domAtivo) {
+                        // Marcar o domínio ativo atual como esgotado
+                        $pdo->prepare("UPDATE cloudflare_dominios SET ativo = 0, esgotado = 1 WHERE id = ?")
+                            ->execute([$domAtivo['id']]);
+                    }
+
+                    // Buscar o próximo domínio não esgotado
+                    $stmtProx = $pdo->query("SELECT * FROM cloudflare_dominios WHERE esgotado = 0 ORDER BY id ASC LIMIT 1");
+                    $proximoDom = $stmtProx ? $stmtProx->fetch() : false;
+
+                    if ($proximoDom) {
+                        // Ativar o próximo domínio
+                        $pdo->prepare("UPDATE cloudflare_dominios SET ativo = 1 WHERE id = ?")
+                            ->execute([$proximoDom['id']]);
+
+                        // Atualizar configuracoes com o novo domínio e resetar contador para 1
+                        $novoDominio = ltrim($proximoDom['dominio'], '@');
+                        if (strpos($novoDominio, '@') !== 0) $novoDominio = '@' . $novoDominio;
+                        $pdo->prepare("UPDATE configuracoes SET email_dominio = ?, email_prefixo = ?, email_contador = 1")
+                            ->execute([$novoDominio, $proximoDom['prefixo']]);
+
+                        // Atualizar o $config local
+                        $config['email_dominio'] = $novoDominio;
+                        $config['email_prefixo'] = $proximoDom['prefixo'];
+                        $config['email_contador'] = 1;
+
+                        // Registrar no log Cloudflare
+                        $pdo->prepare("INSERT INTO cloudflare_api_logs (texto) VALUES (?)")
+                            ->execute(["[AUTO] Domínio trocado para {$novoDominio} após atingir 200 e-mails."]);
+
+                        $novoDomTexto = ltrim($novoDominio, '@');
+                        header("Location: index.php?msg=dominio_trocado&novo_dominio=" . urlencode($novoDomTexto));
+                        exit;
+                    } else {
+                        // Nenhum domínio disponível
+                        header("Location: index.php?msg=todos_dominios_esgotados");
+                        exit;
+                    }
+                }
+
                 $email = $config['email_prefixo'] . $config['email_contador'] . $config['email_dominio'];
 
                 // Verificação de pré-existência no banco de dados
@@ -439,6 +485,22 @@ switch ($acao) {
                     // Incrementa para o próximo e-mail de forma bem sucedida
                     $config['email_contador']++;
                     $pdo->query("UPDATE configuracoes SET email_contador = email_contador + 1");
+
+                    // Verificar se acabou de atingir 200 — avisar na próxima vez que carregar a página
+                    if ((int)$config['email_contador'] > 200) {
+                        // Verificar se há domínios disponíveis para rotacionar
+                        $stmtHaDom = $pdo->query("SELECT COUNT(*) FROM cloudflare_dominios WHERE esgotado = 0");
+                        $haDom = $stmtHaDom ? (int)$stmtHaDom->fetchColumn() : 0;
+
+                        if ($haDom === 0) {
+                            // Sem domínios: avisar que esgotou
+                            sincronizarSlackTracker($pdo);
+                            header("Location: index.php?msg=dominio_esgotado");
+                            exit;
+                        }
+                        // Se houver domínios, na próxima geração rotaciona automaticamente
+                    }
+
                     $emailValido = true;
                 } catch (PDOException $e) {
                     // Trata colisões concorrentes (Integrity constraint violation)
@@ -731,6 +793,51 @@ switch ($acao) {
             $pdo->prepare("UPDATE contas SET dev_criada = 0, data_dev_criada = NULL WHERE id = ?")->execute([$id]);
         }
         break;
+
+    case 'adicionar_dominio_cf':
+        $prefixo = trim($_POST['cf_prefixo'] ?? 'conta');
+        $dominio = trim($_POST['cf_dominio'] ?? '');
+        if (!empty($dominio)) {
+            if (strpos($dominio, '@') !== 0) $dominio = '@' . $dominio;
+            $pdo->prepare("INSERT INTO cloudflare_dominios (prefixo, dominio, contador, ativo, esgotado) VALUES (?, ?, 1, 0, 0)")
+                ->execute([$prefixo, $dominio]);
+        }
+        header("Location: cloudflare.php?msg=dominio_adicionado");
+        exit;
+
+    case 'remover_dominio_cf':
+        $id = filter_input(INPUT_POST, 'dominio_id', FILTER_VALIDATE_INT);
+        if ($id) {
+            $pdo->prepare("DELETE FROM cloudflare_dominios WHERE id = ?")->execute([$id]);
+        }
+        header("Location: cloudflare.php?msg=dominio_removido");
+        exit;
+
+    case 'ativar_dominio_cf':
+        $id = filter_input(INPUT_POST, 'dominio_id', FILTER_VALIDATE_INT);
+        if ($id) {
+            // Desativa todos e ativa apenas este
+            $pdo->query("UPDATE cloudflare_dominios SET ativo = 0");
+            $pdo->prepare("UPDATE cloudflare_dominios SET ativo = 1, esgotado = 0 WHERE id = ?")->execute([$id]);
+            // Sincroniza com configuracoes
+            $dom = $pdo->prepare("SELECT prefixo, dominio FROM cloudflare_dominios WHERE id = ?");
+            $dom->execute([$id]);
+            $domData = $dom->fetch();
+            if ($domData) {
+                $pdo->prepare("UPDATE configuracoes SET email_dominio = ?, email_prefixo = ?, email_contador = 1")
+                    ->execute([$domData['dominio'], $domData['prefixo']]);
+            }
+        }
+        header("Location: cloudflare.php?msg=dominio_ativado");
+        exit;
+
+    case 'resetar_dominio_cf':
+        $id = filter_input(INPUT_POST, 'dominio_id', FILTER_VALIDATE_INT);
+        if ($id) {
+            $pdo->prepare("UPDATE cloudflare_dominios SET contador = 1, esgotado = 0 WHERE id = ?")->execute([$id]);
+        }
+        header("Location: cloudflare.php?msg=dominio_resetado");
+        exit;
 
     case 'regerar_todas_falhadas':
         $contasFalhadas = $pdo->query("SELECT id, genero, pais, status FROM contas WHERE nome = 'User'")->fetchAll();
@@ -1055,3 +1162,16 @@ switch ($acao) {
 
 header("Location: " . $voltar_para . (strpos($voltar_para, '?') !== false ? '&' : '?') . "msg=ok");
 exit;
+
+// ── Casos: Gerenciamento de Domínios Cloudflare ─────────────────────────────
+function adicionarDominioCf_handler($pdo) {
+    $prefixo = trim($_POST['cf_prefixo'] ?? 'conta');
+    $dominio = trim($_POST['cf_dominio'] ?? '');
+    if (empty($dominio)) return false;
+    // Normalizar: garantir que começa com @
+    if (strpos($dominio, '@') !== 0) $dominio = '@' . $dominio;
+    // Inserir (desativado por padrão, admin ativa)
+    $pdo->prepare("INSERT INTO cloudflare_dominios (prefixo, dominio, contador, ativo, esgotado) VALUES (?, ?, 1, 0, 0)")
+        ->execute([$prefixo, $dominio]);
+    return true;
+}

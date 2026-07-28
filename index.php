@@ -476,7 +476,8 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
                             $restante = 0;
                             if (!empty($conta['criacao_unix'])) $restante = 3600 - ($tempoDb - $conta['criacao_unix']);
                             $dias_vida = 0;
-                            $tempo_referencia = !empty($conta['export_unix']) ? $conta['export_unix'] : (!empty($conta['auth_unix']) ? $conta['auth_unix'] : $conta['criacao_unix']);
+                            // Sempre usa auth_unix como referência para não resetar ao exportar/voltar
+                            $tempo_referencia = !empty($conta['auth_unix']) ? $conta['auth_unix'] : $conta['criacao_unix'];
                             if (in_array($conta['status'], ['autenticada', 'exportado']) && !empty($tempo_referencia)) {
                                 $dias_vida = floor(($tempoDb - $tempo_referencia) / 86400);
                             }
@@ -585,20 +586,21 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
                                                     </form>
                                                 </div>
                                             <?php else: ?>
-                                                <?php if ($dias_vida >= 7): ?>
-                                                    <form method="POST" action="processa.php" class="inline-block">
-                                                        <input type="hidden" name="acao" value="criar_bm">
-                                                        <input type="hidden" name="conta_id" value="<?= $conta['id'] ?>">
+                                                <form method="POST" action="processa.php" class="inline-block">
+                                                    <input type="hidden" name="acao" value="criar_bm">
+                                                    <input type="hidden" name="conta_id" value="<?= $conta['id'] ?>">
+                                                    <?php if ($dias_vida < 7): ?>
+                                                        <button type="submit" class="bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-[9px] uppercase px-1.5 py-0.5 rounded shadow-sm transition active:scale-95 flex items-center gap-0.5" title="Conta nova: <?= $dias_vida ?>d de vida (recomendado 7d)">
+                                                            <i data-lucide="plus-circle" class="w-2.5 h-2.5"></i>
+                                                            BM (<?= $dias_vida ?>d)
+                                                        </button>
+                                                    <?php else: ?>
                                                         <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[9px] uppercase px-1.5 py-0.5 rounded shadow-sm transition active:scale-95 flex items-center gap-0.5">
                                                             <i data-lucide="plus-circle" class="w-2.5 h-2.5"></i>
                                                             Criar BM
                                                         </button>
-                                                    </form>
-                                                <?php else: ?>
-                                                    <span class="inline-block text-[9px] font-bold text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800/40 px-1 py-0.5 rounded" title="Aguardando maturação de 7 dias">
-                                                        BM: Falta <?= 7 - $dias_vida ?>d
-                                                    </span>
-                                                <?php endif; ?>
+                                                    <?php endif; ?>
+                                                </form>
                                             <?php endif; ?>
                                         </div>
                                         
@@ -622,20 +624,21 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
                                                     </form>
                                                 </div>
                                             <?php else: ?>
-                                                <?php if ($dias_vida >= 7): ?>
-                                                    <form method="POST" action="processa.php" class="inline-block">
-                                                        <input type="hidden" name="acao" value="criar_pagina">
-                                                        <input type="hidden" name="conta_id" value="<?= $conta['id'] ?>">
+                                                <form method="POST" action="processa.php" class="inline-block">
+                                                    <input type="hidden" name="acao" value="criar_pagina">
+                                                    <input type="hidden" name="conta_id" value="<?= $conta['id'] ?>">
+                                                    <?php if ($dias_vida < 7): ?>
+                                                        <button type="submit" class="bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-[9px] uppercase px-1.5 py-0.5 rounded shadow-sm transition active:scale-95 flex items-center gap-0.5" title="Conta nova: <?= $dias_vida ?>d de vida (recomendado 7d)">
+                                                            <i data-lucide="plus-circle" class="w-2.5 h-2.5"></i>
+                                                            Pág (<?= $dias_vida ?>d)
+                                                        </button>
+                                                    <?php else: ?>
                                                         <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-[9px] uppercase px-1.5 py-0.5 rounded shadow-sm transition active:scale-95 flex items-center gap-0.5">
                                                             <i data-lucide="plus-circle" class="w-2.5 h-2.5"></i>
                                                             Criar Pág
                                                         </button>
-                                                    </form>
-                                                <?php else: ?>
-                                                    <span class="inline-block text-[9px] font-bold text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800/40 px-1 py-0.5 rounded" title="Aguardando maturação de 7 dias">
-                                                        Pág: Falta <?= 7 - $dias_vida ?>d
-                                                    </span>
-                                                <?php endif; ?>
+                                                    <?php endif; ?>
+                                                </form>
                                             <?php endif; ?>
                                         </div>
                                         
@@ -659,20 +662,21 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
                                                     </form>
                                                 </div>
                                             <?php else: ?>
-                                                <?php if ($dias_vida >= 7): ?>
-                                                    <form method="POST" action="processa.php" class="inline-block">
-                                                        <input type="hidden" name="acao" value="criar_dev">
-                                                        <input type="hidden" name="conta_id" value="<?= $conta['id'] ?>">
+                                                <form method="POST" action="processa.php" class="inline-block">
+                                                    <input type="hidden" name="acao" value="criar_dev">
+                                                    <input type="hidden" name="conta_id" value="<?= $conta['id'] ?>">
+                                                    <?php if ($dias_vida < 7): ?>
+                                                        <button type="submit" class="bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-[9px] uppercase px-1.5 py-0.5 rounded shadow-sm transition active:scale-95 flex items-center gap-0.5" title="Conta nova: <?= $dias_vida ?>d de vida (recomendado 7d)">
+                                                            <i data-lucide="plus-circle" class="w-2.5 h-2.5"></i>
+                                                            Dev (<?= $dias_vida ?>d)
+                                                        </button>
+                                                    <?php else: ?>
                                                         <button type="submit" class="bg-orange-600 hover:bg-orange-700 text-white font-extrabold text-[9px] uppercase px-1.5 py-0.5 rounded shadow-sm transition active:scale-95 flex items-center gap-0.5">
                                                             <i data-lucide="plus-circle" class="w-2.5 h-2.5"></i>
                                                             Criar Dev
                                                         </button>
-                                                    </form>
-                                                <?php else: ?>
-                                                    <span class="inline-block text-[9px] font-bold text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800/40 px-1 py-0.5 rounded" title="Aguardando maturação de 7 dias">
-                                                        Dev: Falta <?= 7 - $dias_vida ?>d
-                                                    </span>
-                                                <?php endif; ?>
+                                                    <?php endif; ?>
+                                                </form>
                                             <?php endif; ?>
                                         </div>
                                     </div>
@@ -1039,6 +1043,44 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
         </div>
     </div>
 
+    <!-- Modal Domínio Esgotado -->
+    <div id="modalDominioEsgotado" class="hidden fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2rem] shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800 transform scale-90 opacity-0 transition-all duration-300" id="modalDominioEsgotadoCard">
+            <div class="p-8 text-center space-y-4">
+                <div class="w-16 h-16 bg-rose-100 dark:bg-rose-900/30 text-rose-600 rounded-2xl flex items-center justify-center mx-auto">
+                    <i data-lucide="alert-octagon" class="w-8 h-8"></i>
+                </div>
+                <h3 class="text-xl font-black text-slate-800 dark:text-slate-100">Domínio Esgotado!</h3>
+                <p class="text-slate-500 dark:text-slate-400 text-sm font-medium">
+                    O domínio atual atingiu o limite de <strong class="text-rose-500">200 e-mails</strong>.<br>
+                    É necessário trocar o domínio nas <a href="config.php" class="text-blue-500 hover:underline font-bold">Configurações</a> ou cadastrar novos domínios na página do <a href="cloudflare.php" class="text-orange-500 hover:underline font-bold">Cloudflare</a>.
+                </p>
+                <button onclick="fecharModalDominioEsgotado()" class="w-full bg-rose-600 hover:bg-rose-700 text-white py-3 rounded-2xl font-black shadow-lg shadow-rose-600/20 transition active:scale-95">
+                    Entendido
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Todos os Domínios Esgotados -->
+    <div id="modalTodosDominiosEsgotados" class="hidden fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2rem] shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800 transform scale-90 opacity-0 transition-all duration-300" id="modalTodosDominiosCard">
+            <div class="p-8 text-center space-y-4">
+                <div class="w-16 h-16 bg-amber-100 dark:bg-amber-900/30 text-amber-600 rounded-2xl flex items-center justify-center mx-auto">
+                    <i data-lucide="server-crash" class="w-8 h-8"></i>
+                </div>
+                <h3 class="text-xl font-black text-slate-800 dark:text-slate-100">Todos os Domínios Esgotados!</h3>
+                <p class="text-slate-500 dark:text-slate-400 text-sm font-medium">
+                    Todos os domínios cadastrados já atingiram o limite de 200 e-mails.<br>
+                    Adicione novos domínios na página do <a href="cloudflare.php" class="text-orange-500 hover:underline font-bold">Cloudflare</a>.
+                </p>
+                <button onclick="fecharModalTodosDominios()" class="w-full bg-amber-600 hover:bg-amber-700 text-white py-3 rounded-2xl font-black shadow-lg shadow-amber-600/20 transition active:scale-95">
+                    Ir para Cloudflare
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal Editar Conta -->
     <div id="modalEditarConta" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div class="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden transform scale-95 opacity-0 transition-all duration-300" id="modalEditarContaCard">
@@ -1104,10 +1146,18 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
                 setTimeout(() => mostrarToast('Ação realizada com sucesso!'), 300);
             } else if (msg === 'erro_email_duplicado') {
                 setTimeout(() => mostrarToast('Erro: Este e-mail já está cadastrado em outra conta.', 'error'), 300);
+            } else if (msg === 'dominio_esgotado') {
+                setTimeout(() => mostrarAlertaDominioEsgotado(), 300);
+            } else if (msg === 'todos_dominios_esgotados') {
+                setTimeout(() => mostrarAlertaTodosDominiosEsgotados(), 300);
+            } else if (msg === 'dominio_trocado') {
+                const novoDom = urlParams.get('novo_dominio') || '';
+                setTimeout(() => mostrarToast('✅ Domínio trocado automaticamente para ' + novoDom + '!'), 300);
             }
             
             // Limpar o parâmetro msg da URL para evitar reapresentar o toast ao atualizar a página
             urlParams.delete('msg');
+            urlParams.delete('novo_dominio');
             const newSearch = urlParams.toString();
             const newUrl = window.location.pathname + (newSearch ? '?' + newSearch : '') + window.location.hash;
             window.history.replaceState({}, '', newUrl);
@@ -1150,6 +1200,43 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
             setTimeout(() => {
                 modal.classList.add('hidden');
             }, 300);
+        }
+
+        // ── Modais de Domínio Esgotado ────────────────────────────────
+        function mostrarAlertaDominioEsgotado() {
+            const modal = document.getElementById('modalDominioEsgotado');
+            const card = document.getElementById('modalDominioEsgotadoCard');
+            modal.classList.remove('hidden');
+            void modal.offsetWidth;
+            card.classList.remove('scale-90', 'opacity-0');
+            card.classList.add('scale-100', 'opacity-100');
+            lucide.createIcons();
+        }
+
+        function fecharModalDominioEsgotado() {
+            const modal = document.getElementById('modalDominioEsgotado');
+            const card = document.getElementById('modalDominioEsgotadoCard');
+            card.classList.remove('scale-100', 'opacity-100');
+            card.classList.add('scale-90', 'opacity-0');
+            setTimeout(() => modal.classList.add('hidden'), 300);
+        }
+
+        function mostrarAlertaTodosDominiosEsgotados() {
+            const modal = document.getElementById('modalTodosDominiosEsgotados');
+            const card = document.getElementById('modalTodosDominiosCard');
+            modal.classList.remove('hidden');
+            void modal.offsetWidth;
+            card.classList.remove('scale-90', 'opacity-0');
+            card.classList.add('scale-100', 'opacity-100');
+            lucide.createIcons();
+        }
+
+        function fecharModalTodosDominios() {
+            const modal = document.getElementById('modalTodosDominiosEsgotados');
+            const card = document.getElementById('modalTodosDominiosCard');
+            card.classList.remove('scale-100', 'opacity-100');
+            card.classList.add('scale-90', 'opacity-0');
+            setTimeout(() => { modal.classList.add('hidden'); window.location.href = 'cloudflare.php'; }, 300);
         }
 
         // ── Configurações persistentes ────────────────────────────────
