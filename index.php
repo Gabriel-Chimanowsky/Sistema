@@ -833,14 +833,19 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
                         <button onclick="colar2FADireto(<?= $conta['id'] ?>)" class="flex-shrink-0 p-1"><i data-lucide="edit-3" class="w-3.5 h-3.5 text-slate-400"></i></button>
                     </div>
                     <?php endif; ?>
-                    <?php if ($conta['destinada_a']): ?>
                     <div class="mobile-card-row">
                         <span class="mobile-card-label">Dono</span>
-                        <?php foreach ($pessoas as $p): if ($p['id'] == $conta['destinada_a']): ?>
-                        <span class="mobile-card-value"><?= htmlspecialchars($p['nome']) ?></span>
-                        <?php endif; endforeach; ?>
+                        <form method="POST" action="processa.php" class="inline-block flex-shrink-0">
+                            <input type="hidden" name="acao" value="vincular_pessoa">
+                            <input type="hidden" name="conta_id" value="<?= $conta['id'] ?>">
+                            <select name="pessoa_id" onchange="this.form.submit()" class="bg-slate-100 dark:bg-slate-800 text-xs font-semibold outline-none border border-slate-200 dark:border-slate-700 cursor-pointer px-2 py-1 rounded-lg">
+                                <option value="">-- Livre --</option>
+                                <?php foreach ($pessoas as $p): ?>
+                                    <option value="<?= $p['id'] ?>" <?= ($conta['destinada_a'] == $p['id']) ? 'selected' : '' ?>><?= htmlspecialchars($p['nome']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </form>
                     </div>
-                    <?php endif; ?>
                 </div>
                 <div class="mobile-card-footer">
                     <!-- Status select -->
@@ -1127,6 +1132,16 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
                     <label class="text-[10px] font-bold text-slate-500 uppercase">2FA</label>
                     <input type="text" name="codigo_2fa" id="editConta2fa" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm outline-none focus:border-blue-500 transition">
                 </div>
+
+                <div class="space-y-1">
+                    <label class="text-[10px] font-bold text-slate-500 uppercase">Dono / Destinada a</label>
+                    <select name="pessoa_id" id="editContaPessoaId" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm outline-none focus:border-blue-500 transition cursor-pointer font-semibold">
+                        <option value="">-- Livre --</option>
+                        <?php foreach ($pessoas as $p): ?>
+                            <option value="<?= $p['id'] ?>"><?= htmlspecialchars($p['nome']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
                 
                 <div class="space-y-1 pt-2">
                     <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-blue-600/20 transition-all active:scale-95">
@@ -1178,6 +1193,7 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
             document.getElementById('editContaUsername').value = data.username || '';
             document.getElementById('editContaSenha').value = data.senha || '';
             document.getElementById('editConta2fa').value = data.codigo_2fa || '';
+            document.getElementById('editContaPessoaId').value = data.destinada_a || '';
             
             const modal = document.getElementById('modalEditarConta');
             const card = document.getElementById('modalEditarContaCard');

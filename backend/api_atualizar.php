@@ -31,8 +31,13 @@ try {
         $pdo->prepare($sql)->execute([$id]);
     } elseif ($acao === 'vincular_pessoa') {
         $pessoa_id = filter_input(INPUT_POST, 'pessoa_id', FILTER_VALIDATE_INT) ?: null;
-        $sql = "UPDATE contas SET destinada_a = ? WHERE id = ?";
-        $pdo->prepare($sql)->execute([$pessoa_id, $id]);
+        if ($pessoa_id) {
+            $sql = "UPDATE contas SET destinada_a = ?, data_vinculo = NOW() WHERE id = ?";
+            $pdo->prepare($sql)->execute([$pessoa_id, $id]);
+        } else {
+            $sql = "UPDATE contas SET destinada_a = NULL, data_vinculo = NULL WHERE id = ?";
+            $pdo->prepare($sql)->execute([$id]);
+        }
         
         require_once '../cloudflare_helper.php';
         sincronizarRedirecionamentoConta($id, $pdo);

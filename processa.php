@@ -867,6 +867,7 @@ switch ($acao) {
         $username = trim($_POST['username'] ?? '');
         $senha = trim($_POST['senha'] ?? '');
         $codigo_2fa = trim($_POST['codigo_2fa'] ?? '');
+        $pessoa_id = filter_input(INPUT_POST, 'pessoa_id', FILTER_VALIDATE_INT) ?: null;
         
         if ($id) {
             // Verificar se o e-mail já está cadastrado em outra conta
@@ -879,18 +880,23 @@ switch ($acao) {
                 }
             }
 
-            $stmt = $pdo->prepare("SELECT status FROM contas WHERE id = ?");
+            $stmt = $pdo->prepare("SELECT status, destinada_a FROM contas WHERE id = ?");
             $stmt->execute([$id]);
-            $statusAtual = $stmt->fetchColumn();
+            $contaAtual = $stmt->fetch();
+            $statusAtual = $contaAtual['status'] ?? '';
+            $donoAnterior = $contaAtual['destinada_a'] ?? null;
             
             try {
                 if ($codigo_2fa !== '' && $statusAtual !== 'exportado') {
-                    $pdo->prepare("UPDATE contas SET nome = ?, sobrenome = ?, email = ?, username = ?, senha = ?, codigo_2fa = ?, status = 'autenticada', data_autenticacao = NOW() WHERE id = ?")
-                        ->execute([$nome, $sobrenome, $email, $username, $senha, $codigo_2fa, $id]);
+                    $pdo->prepare("UPDATE contas SET nome = ?, sobrenome = ?, email = ?, username = ?, senha = ?, codigo_2fa = ?, destinada_a = ?, data_vinculo = IF(? IS NOT NULL AND ? != ?, NOW(), data_vinculo), status = 'autenticada', data_autenticacao = NOW() WHERE id = ?")
+                        ->execute([$nome, $sobrenome, $email, $username, $senha, $codigo_2fa, $pessoa_id, $pessoa_id, $pessoa_id, $donoAnterior, $id]);
                 } else {
-                    $pdo->prepare("UPDATE contas SET nome = ?, sobrenome = ?, email = ?, username = ?, senha = ?, codigo_2fa = ? WHERE id = ?")
-                        ->execute([$nome, $sobrenome, $email, $username, $senha, $codigo_2fa, $id]);
+                    $pdo->prepare("UPDATE contas SET nome = ?, sobrenome = ?, email = ?, username = ?, senha = ?, codigo_2fa = ?, destinada_a = ?, data_vinculo = IF(? IS NOT NULL AND ? != ?, NOW(), data_vinculo) WHERE id = ?")
+                        ->execute([$nome, $sobrenome, $email, $username, $senha, $codigo_2fa, $pessoa_id, $pessoa_id, $pessoa_id, $donoAnterior, $id]);
                 }
+                
+                require_once 'cloudflare_helper.php';
+                sincronizarRedirecionamentoConta($id, $pdo);
             } catch (PDOException $e) {
                 if ($e->getCode() == 23000 || strpos($e->getMessage(), '1062') !== false) {
                     header("Location: " . $voltar_para . (strpos($voltar_para, '?') !== false ? '&' : '?') . "msg=erro_email_duplicado");
