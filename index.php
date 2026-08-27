@@ -139,6 +139,7 @@ $pessoas = $stmtPessoas->fetchAll();
 
 // Filtro de comentario
 $filtroComentario = $_GET['comentario'] ?? '';
+$filtroNome = trim($_GET['nome'] ?? '');
 
 // Paginacao - limit vindo do GET
 $limitOpcoes = [25, 50, 100, 200, 500];
@@ -149,14 +150,23 @@ $page = filter_input(INPUT_GET, 'page', FILTER_VALIDATE_INT) ?: 1;
 if ($page < 1) $page = 1;
 
 // WHERE dinamico
-$whereClause = '';
-if ($filtroComentario === 'com') {
-    $whereClause = 'WHERE nota_conta IS NOT NULL AND nota_conta <> ""';
-} elseif ($filtroComentario === 'sem') {
-    $whereClause = 'WHERE (nota_conta IS NULL OR nota_conta = "")';
+$whereParts = [];
+$whereParams = [];
+if ($filtroNome !== '') {
+    $whereParts[] = '(nome LIKE ? OR sobrenome LIKE ?)';
+    $whereParams[] = '%' . $filtroNome . '%';
+    $whereParams[] = '%' . $filtroNome . '%';
 }
+if ($filtroComentario === 'com') {
+    $whereParts[] = 'nota_conta IS NOT NULL AND nota_conta <> ""';
+} elseif ($filtroComentario === 'sem') {
+    $whereParts[] = '(nota_conta IS NULL OR nota_conta = "")';
+}
+$whereClause = $whereParts ? 'WHERE ' . implode(' AND ', $whereParts) : '';
 
-$totalContasQuery = $pdo->query("SELECT COUNT(*) FROM contas {$whereClause}")->fetchColumn();
+$stmtTotalContas = $pdo->prepare("SELECT COUNT(*) FROM contas {$whereClause}");
+$stmtTotalContas->execute($whereParams);
+$totalContasQuery = $stmtTotalContas->fetchColumn();
 $totalPages = max(1, ceil($totalContasQuery / $limit));
 if ($page > $totalPages) $page = $totalPages;
 
@@ -164,19 +174,22 @@ $offset = ($page - 1) * $limit;
 
 $ordemSQL = "{$sort} {$dir}";
 $stmtContas = $pdo->prepare("SELECT *, UNIX_TIMESTAMP(data_criacao) as criacao_unix, UNIX_TIMESTAMP(data_autenticacao) as auth_unix, UNIX_TIMESTAMP(data_exportado) as export_unix FROM contas {$whereClause} ORDER BY {$ordemSQL} LIMIT ? OFFSET ?");
-$stmtContas->bindValue(1, $limit, PDO::PARAM_INT);
-$stmtContas->bindValue(2, $offset, PDO::PARAM_INT);
+$stmtContasParams = array_merge($whereParams, [$limit, $offset]);
+foreach ($stmtContasParams as $paramIndex => $paramValue) {
+    $stmtContas->bindValue($paramIndex + 1, $paramValue, is_int($paramValue) ? PDO::PARAM_INT : PDO::PARAM_STR);
+}
 $stmtContas->execute();
 $contas = $stmtContas->fetchAll();
 $tempoDb = time();
 
 function buildQuery(array $extra = []): string {
-    global $sort, $dir, $limit, $filtroComentario;
+    global $sort, $dir, $limit, $filtroComentario, $filtroNome;
     $params = array_merge([
         'sort'       => $sort,
         'dir'        => $dir,
         'limit'      => $limit,
         'comentario' => $filtroComentario,
+        'nome'       => $filtroNome,
     ], $extra);
     $params = array_filter($params, fn($v) => $v !== '' && $v !== null);
     return '?' . http_build_query($params);
@@ -412,6 +425,23 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
                 <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i>
                 Filtros
             </span>
+
+            <form method="GET" action="index.php" class="flex items-center gap-1">
+                <input type="hidden" name="sort" value="<?= htmlspecialchars($sort) ?>">
+                <input type="hidden" name="dir" value="<?= htmlspecialchars($dir) ?>">
+                <input type="hidden" name="limit" value="<?= $limit ?>">
+                <input type="hidden" name="comentario" value="<?= htmlspecialchars($filtroComentario) ?>">
+                <div class="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 rounded-xl px-2 py-1">
+                    <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400"></i>
+                    <input type="search" name="nome" value="<?= htmlspecialchars($filtroNome) ?>" placeholder="Pesquisar nome" aria-label="Pesquisar por nome" class="w-40 md:w-52 bg-transparent text-xs font-semibold outline-none placeholder:text-slate-400">
+                    <button type="submit" class="px-2.5 py-1 rounded-lg bg-blue-600 text-white text-[11px] font-black hover:bg-blue-700 transition">Buscar</button>
+                    <?php if ($filtroNome !== ''): ?>
+                        <a href="<?= buildQuery(['nome' => '', 'page' => 1]) ?>" class="p-1 text-slate-400 hover:text-red-500 transition" title="Limpar pesquisa" aria-label="Limpar pesquisa">
+                            <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                        </a>
+                    <?php endif; ?>
+                </div>
+            </form>
 
             <!-- Filtro: Comentário -->
             <div class="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 rounded-xl p-1">
