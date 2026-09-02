@@ -38,14 +38,18 @@ try {
             $preco_bm = (float)($cfg['preco_bm'] ?? 30.00);
             $preco_pagina = (float)($cfg['preco_pagina'] ?? 10.00);
 
-            $sql = "UPDATE contas SET 
-                    destinada_a = ?, 
-                    data_vinculo = IF(destinada_a IS NULL OR destinada_a != ?, NOW(), data_vinculo),
-                    valor_perfil = COALESCE(valor_perfil, ?),
-                    valor_bm = IF(bm_criada = 1, COALESCE(valor_bm, ?), valor_bm),
-                    valor_pagina = IF(pagina_criada = 1, COALESCE(valor_pagina, ?), valor_pagina)
-                    WHERE id = ?";
-            $pdo->prepare($sql)->execute([$pessoa_id, $pessoa_id, $preco_perfil, $preco_bm, $preco_pagina, $id]);
+            $stmtConta = $pdo->prepare("SELECT destinada_a, bm_criada, pagina_criada, valor_perfil FROM contas WHERE id = ?");
+            $stmtConta->execute([$id]);
+            $cAtual = $stmtConta->fetch();
+
+            if ($cAtual && $cAtual['destinada_a'] == $pessoa_id && $cAtual['valor_perfil'] !== null) {
+                $pdo->prepare("UPDATE contas SET destinada_a = ? WHERE id = ?")->execute([$pessoa_id, $id]);
+            } else {
+                $v_bm = ($cAtual && $cAtual['bm_criada'] == 1) ? $preco_bm : null;
+                $v_pag = ($cAtual && $cAtual['pagina_criada'] == 1) ? $preco_pagina : null;
+                $pdo->prepare("UPDATE contas SET destinada_a = ?, data_vinculo = NOW(), valor_perfil = ?, valor_bm = ?, valor_pagina = ? WHERE id = ?")
+                    ->execute([$pessoa_id, $preco_perfil, $v_bm, $v_pag, $id]);
+            }
         } else {
             $sql = "UPDATE contas SET destinada_a = NULL, data_vinculo = NULL, valor_perfil = NULL, valor_bm = NULL, valor_pagina = NULL WHERE id = ?";
             $pdo->prepare($sql)->execute([$id]);

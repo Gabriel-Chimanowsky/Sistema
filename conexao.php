@@ -115,9 +115,13 @@ try {
             $initBm = (float)($cfgInit['preco_bm'] ?? 30.00);
             $initPagina = (float)($cfgInit['preco_pagina'] ?? 10.00);
 
-            $pdo->query("UPDATE contas SET valor_perfil = {$initPerfil} WHERE destinada_a IS NOT NULL AND data_vinculo IS NOT NULL AND valor_perfil IS NULL");
-            $pdo->query("UPDATE contas SET valor_bm = {$initBm} WHERE bm_criada = 1 AND destinada_a IS NOT NULL AND data_vinculo IS NOT NULL AND valor_bm IS NULL");
-            $pdo->query("UPDATE contas SET valor_pagina = {$initPagina} WHERE pagina_criada = 1 AND destinada_a IS NOT NULL AND data_vinculo IS NOT NULL AND valor_pagina IS NULL");
+            // Garantir que contas livres (não vinculadas a ninguém) fiquem com valor NULL para receber o novo preço quando forem vinculadas
+            $pdo->query("UPDATE contas SET valor_perfil = NULL, valor_bm = NULL, valor_pagina = NULL WHERE (destinada_a IS NULL OR destinada_a = 0 OR destinada_a = '')");
+
+            // Congelar contas que já estão vinculadas a pessoas e ainda não tinham valor gravado
+            $pdo->query("UPDATE contas SET valor_perfil = {$initPerfil} WHERE destinada_a IS NOT NULL AND destinada_a > 0 AND data_vinculo IS NOT NULL AND valor_perfil IS NULL");
+            $pdo->query("UPDATE contas SET valor_bm = {$initBm} WHERE bm_criada = 1 AND destinada_a IS NOT NULL AND destinada_a > 0 AND data_vinculo IS NOT NULL AND valor_bm IS NULL");
+            $pdo->query("UPDATE contas SET valor_pagina = {$initPagina} WHERE pagina_criada = 1 AND destinada_a IS NOT NULL AND destinada_a > 0 AND data_vinculo IS NOT NULL AND valor_pagina IS NULL");
         } catch (Exception $eInit) {}
         
 

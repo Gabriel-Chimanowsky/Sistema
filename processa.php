@@ -281,14 +281,22 @@ switch ($acao) {
                     $preco_bm = (float)($cfg['preco_bm'] ?? 30.00);
                     $preco_pagina = (float)($cfg['preco_pagina'] ?? 10.00);
 
-                    $params = array_merge([$pessoa_id, $pessoa_id, $preco_perfil, $preco_bm, $preco_pagina], $idsArray);
-                    $pdo->prepare("UPDATE contas SET 
-                        destinada_a = ?, 
-                        data_vinculo = IF(destinada_a IS NULL OR destinada_a != ?, NOW(), data_vinculo),
-                        valor_perfil = COALESCE(valor_perfil, ?),
-                        valor_bm = IF(bm_criada = 1, COALESCE(valor_bm, ?), valor_bm),
-                        valor_pagina = IF(pagina_criada = 1, COALESCE(valor_pagina, ?), valor_pagina)
-                        WHERE id IN ($in)")->execute($params);
+                    foreach ($idsArray as $cid) {
+                        $stmtConta = $pdo->prepare("SELECT destinada_a, bm_criada, pagina_criada, valor_perfil FROM contas WHERE id = ?");
+                        $stmtConta->execute([$cid]);
+                        $cAtual = $stmtConta->fetch();
+
+                        if ($cAtual && $cAtual['destinada_a'] == $pessoa_id && $cAtual['valor_perfil'] !== null) {
+                            // Já vinculada à mesma pessoa: mantém
+                            $pdo->prepare("UPDATE contas SET destinada_a = ? WHERE id = ?")->execute([$pessoa_id, $cid]);
+                        } else {
+                            // Novo vínculo: aplica tabela de preços atual
+                            $v_bm = ($cAtual && $cAtual['bm_criada'] == 1) ? $preco_bm : null;
+                            $v_pag = ($cAtual && $cAtual['pagina_criada'] == 1) ? $preco_pagina : null;
+                            $pdo->prepare("UPDATE contas SET destinada_a = ?, data_vinculo = NOW(), valor_perfil = ?, valor_bm = ?, valor_pagina = ? WHERE id = ?")
+                                ->execute([$pessoa_id, $preco_perfil, $v_bm, $v_pag, $cid]);
+                        }
+                    }
                 } else {
                     $pdo->prepare("UPDATE contas SET destinada_a = NULL, data_vinculo = NULL, valor_perfil = NULL, valor_bm = NULL, valor_pagina = NULL WHERE id IN ($in)")->execute($idsArray);
                 }
@@ -568,13 +576,20 @@ switch ($acao) {
             $preco_bm = (float)($cfg['preco_bm'] ?? 30.00);
             $preco_pagina = (float)($cfg['preco_pagina'] ?? 10.00);
 
-            $pdo->prepare("UPDATE contas SET 
-                destinada_a = ?, 
-                data_vinculo = IF(destinada_a IS NULL OR destinada_a != ?, NOW(), data_vinculo),
-                valor_perfil = COALESCE(valor_perfil, ?),
-                valor_bm = IF(bm_criada = 1, COALESCE(valor_bm, ?), valor_bm),
-                valor_pagina = IF(pagina_criada = 1, COALESCE(valor_pagina, ?), valor_pagina)
-                WHERE id = ?")->execute([$pessoa_id, $pessoa_id, $preco_perfil, $preco_bm, $preco_pagina, $id]);
+            $stmtConta = $pdo->prepare("SELECT destinada_a, bm_criada, pagina_criada, valor_perfil FROM contas WHERE id = ?");
+            $stmtConta->execute([$id]);
+            $cAtual = $stmtConta->fetch();
+
+            if ($cAtual && $cAtual['destinada_a'] == $pessoa_id && $cAtual['valor_perfil'] !== null) {
+                // Já estava vinculada a esta mesma pessoa com valor gravado: mantém
+                $pdo->prepare("UPDATE contas SET destinada_a = ? WHERE id = ?")->execute([$pessoa_id, $id]);
+            } else {
+                // Novo vínculo: grava os valores vigentes da nova tabela de preços
+                $v_bm = ($cAtual && $cAtual['bm_criada'] == 1) ? $preco_bm : null;
+                $v_pag = ($cAtual && $cAtual['pagina_criada'] == 1) ? $preco_pagina : null;
+                $pdo->prepare("UPDATE contas SET destinada_a = ?, data_vinculo = NOW(), valor_perfil = ?, valor_bm = ?, valor_pagina = ? WHERE id = ?")
+                    ->execute([$pessoa_id, $preco_perfil, $v_bm, $v_pag, $id]);
+            }
         } else {
             $pdo->prepare("UPDATE contas SET destinada_a = NULL, data_vinculo = NULL, valor_perfil = NULL, valor_bm = NULL, valor_pagina = NULL WHERE id = ?")->execute([$id]);
         }
@@ -921,14 +936,32 @@ switch ($acao) {
             if ($pessoa_id) {
                 $stmtConf = $pdo->query("SELECT preco_perfil, preco_bm, preco_pagina FROM configuracoes LIMIT 1");
                 $cfg = $stmtConf->fetch();
-                if ($valor_perfil === null) {
-                    $valor_perfil = $contaAtual['valor_perfil'] ?? (float)($cfg['preco_perfil'] ?? 20.00);
+                $preco_perfil_cfg = (float)($cfg['preco_perfil'] ?? 20.00);
+                $preco_bm_cfg = (float)($cfg['preco_bm'] ?? 30.00);
+                $preco_pagina_cfg = (float)($cfg['preco_pagina'] ?? 10.00);
+
+                if ($valor_perfil !== null) {
+                    // Mantém valor digitado manualmente no formulário
+                } elseif ($donoAnterior == $pessoa_id && $contaAtual['valor_perfil'] !== null) {
+                    $valor_perfil = $contaAtual['valor_perfil'];
+                } else {
+                    $valor_perfil = $preco_perfil_cfg;
                 }
-                if ($contaAtual['bm_criada'] == 1 && $valor_bm === null) {
-                    $valor_bm = $contaAtual['valor_bm'] ?? (float)($cfg['preco_bm'] ?? 30.00);
+
+                if ($valor_bm !== null) {
+                    // Mantém valor digitado manualmente
+                } elseif ($contaAtual['bm_criada'] == 1) {
+                    $valor_bm = ($donoAnterior == $pessoa_id && $contaAtual['valor_bm'] !== null) ? $contaAtual['valor_bm'] : $preco_bm_cfg;
+                } else {
+                    $valor_bm = null;
                 }
-                if ($contaAtual['pagina_criada'] == 1 && $valor_pagina === null) {
-                    $valor_pagina = $contaAtual['valor_pagina'] ?? (float)($cfg['preco_pagina'] ?? 10.00);
+
+                if ($valor_pagina !== null) {
+                    // Mantém valor digitado manualmente
+                } elseif ($contaAtual['pagina_criada'] == 1) {
+                    $valor_pagina = ($donoAnterior == $pessoa_id && $contaAtual['valor_pagina'] !== null) ? $contaAtual['valor_pagina'] : $preco_pagina_cfg;
+                } else {
+                    $valor_pagina = null;
                 }
             } else {
                 $valor_perfil = null;
