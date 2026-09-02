@@ -107,21 +107,33 @@ $config = $stmt->fetch();
             <!-- Nova Seção: Financeiro -->
             <div class="border-t pt-10 dark:border-slate-800 grid grid-cols-1 md:grid-cols-3 gap-10">
                 <div class="space-y-6 md:col-span-3">
-                    <h3 class="text-xs font-black uppercase tracking-[0.2em] text-slate-400 border-b pb-2 dark:border-slate-800">Valores Financeiros (R$)</h3>
+                    <div class="flex items-center justify-between border-b pb-2 dark:border-slate-800">
+                        <h3 class="text-xs font-black uppercase tracking-[0.2em] text-slate-400">Valores Financeiros (Tabela de Preços)</h3>
+                        <span class="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-full border border-emerald-200 dark:border-emerald-800">
+                            🛡️ Histórico Protegido
+                        </span>
+                    </div>
                     
+                    <div class="bg-blue-50/70 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/50 p-4 rounded-2xl text-xs flex items-start gap-3">
+                        <i data-lucide="shield-check" class="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5"></i>
+                        <p class="text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
+                            <strong>Separação Inteligente:</strong> Ao atualizar os valores abaixo, os novos preços serão aplicados apenas às <strong>novas contas e adicionais vinculados a partir de agora</strong>. As contas que já foram vinculadas/cobradas anteriormente permanecerão com os <strong>valores históricos congelados intactos</strong>.
+                        </p>
+                    </div>
+
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div class="space-y-2">
-                            <label class="block text-sm font-bold text-slate-500 uppercase tracking-wider ml-1">Preço Base do Perfil</label>
+                            <label class="block text-sm font-bold text-slate-500 uppercase tracking-wider ml-1">Preço Base do Perfil (R$)</label>
                             <input type="number" step="0.01" name="preco_perfil" value="<?= htmlspecialchars($config['preco_perfil'] ?? '20.00') ?>" 
                                 class="w-full bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-blue-500 p-4 rounded-2xl outline-none transition-all font-bold">
                         </div>
                         <div class="space-y-2">
-                            <label class="block text-sm font-bold text-slate-500 uppercase tracking-wider ml-1">Adicional BM</label>
+                            <label class="block text-sm font-bold text-slate-500 uppercase tracking-wider ml-1">Adicional BM (R$)</label>
                             <input type="number" step="0.01" name="preco_bm" value="<?= htmlspecialchars($config['preco_bm'] ?? '30.00') ?>" 
                                 class="w-full bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-blue-500 p-4 rounded-2xl outline-none transition-all font-bold">
                         </div>
                         <div class="space-y-2">
-                            <label class="block text-sm font-bold text-slate-500 uppercase tracking-wider ml-1">Adicional Página</label>
+                            <label class="block text-sm font-bold text-slate-500 uppercase tracking-wider ml-1">Adicional Página (R$)</label>
                             <input type="number" step="0.01" name="preco_pagina" value="<?= htmlspecialchars($config['preco_pagina'] ?? '10.00') ?>" 
                                 class="w-full bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-blue-500 p-4 rounded-2xl outline-none transition-all font-bold">
                         </div>

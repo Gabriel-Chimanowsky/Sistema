@@ -1172,6 +1172,24 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
                         <?php endforeach; ?>
                     </select>
                 </div>
+
+                <div class="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
+                    <div class="text-[10px] font-black uppercase tracking-wider text-slate-400">Valores Gravados / Cobrança (R$)</div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <div class="space-y-1">
+                            <label class="text-[9px] font-bold text-slate-400 uppercase">Perfil</label>
+                            <input type="number" step="0.01" name="valor_perfil" id="editContaValorPerfil" placeholder="Auto" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-1.5 text-xs outline-none focus:border-blue-500 transition font-mono">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[9px] font-bold text-slate-400 uppercase">BM</label>
+                            <input type="number" step="0.01" name="valor_bm" id="editContaValorBm" placeholder="Auto" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-1.5 text-xs outline-none focus:border-blue-500 transition font-mono">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[9px] font-bold text-slate-400 uppercase">Página</label>
+                            <input type="number" step="0.01" name="valor_pagina" id="editContaValorPagina" placeholder="Auto" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-1.5 text-xs outline-none focus:border-blue-500 transition font-mono">
+                        </div>
+                    </div>
+                </div>
                 
                 <div class="space-y-1 pt-2">
                     <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-blue-600/20 transition-all active:scale-95">
@@ -1224,6 +1242,9 @@ function linkSort(string $coluna, string $nomeExibicao, string $sortAtual, strin
             document.getElementById('editContaSenha').value = data.senha || '';
             document.getElementById('editConta2fa').value = data.codigo_2fa || '';
             document.getElementById('editContaPessoaId').value = data.destinada_a || '';
+            document.getElementById('editContaValorPerfil').value = (data.valor_perfil !== null && data.valor_perfil !== undefined) ? data.valor_perfil : '';
+            document.getElementById('editContaValorBm').value = (data.valor_bm !== null && data.valor_bm !== undefined) ? data.valor_bm : '';
+            document.getElementById('editContaValorPagina').value = (data.valor_pagina !== null && data.valor_pagina !== undefined) ? data.valor_pagina : '';
             
             const modal = document.getElementById('modalEditarConta');
             const card = document.getElementById('modalEditarContaCard');

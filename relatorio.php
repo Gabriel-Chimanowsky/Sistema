@@ -46,9 +46,13 @@ try {
     $pdo->query("ALTER TABLE contas ADD COLUMN excluir_nota TINYINT(1) NOT NULL DEFAULT 0");
 }
 
-// 1. Clientes COM movimentação no mês (faturamento considera apenas contas válidas/ativas)
+// 1. Clientes COM movimentação no mês (faturamento considera apenas contas válidas/ativas com seus respectivos valores congelados)
 $sql_ativos = "SELECT p.id, p.nome, COALESCE(SUM(CASE WHEN c.excluir_nota = 0 THEN 1 ELSE 0 END), 0) as total,
-                COALESCE(SUM(CASE WHEN c.excluir_nota = 0 THEN {$preco_unidade} + IFNULL(c.bm_criada, 0) * {$preco_bm} + IFNULL(c.pagina_criada, 0) * {$preco_pagina} ELSE 0 END), 0) as valor_contas_total
+                COALESCE(SUM(CASE WHEN c.excluir_nota = 0 THEN 
+                    COALESCE(c.valor_perfil, {$preco_unidade}) 
+                    + (CASE WHEN c.bm_criada = 1 THEN COALESCE(c.valor_bm, {$preco_bm}) ELSE 0 END) 
+                    + (CASE WHEN c.pagina_criada = 1 THEN COALESCE(c.valor_pagina, {$preco_pagina}) ELSE 0 END)
+                ELSE 0 END), 0) as valor_contas_total
                 FROM pessoas p 
                 INNER JOIN contas c ON p.id = c.destinada_a 
                 WHERE DATE_FORMAT(c.data_vinculo, '%Y-%m') = ?
@@ -187,7 +191,7 @@ $valor_total_mes = max(0, $valor_bruto_contas - $total_descontos_mes);
 
         <!-- LOOP DE IMPRESSÃO - UMA FOLHA POR PESSOA ATIVA -->
         <?php foreach ($ativos as $d): 
-            $stmtContas = $pdo->prepare("SELECT id, nome, sobrenome, email, data_vinculo, excluir_nota, bm_criada, pagina_criada FROM contas WHERE destinada_a = ? AND DATE_FORMAT(data_vinculo, '%Y-%m') = ? ORDER BY data_vinculo ASC");
+            $stmtContas = $pdo->prepare("SELECT id, nome, sobrenome, email, data_vinculo, excluir_nota, bm_criada, pagina_criada, valor_perfil, valor_bm, valor_pagina FROM contas WHERE destinada_a = ? AND DATE_FORMAT(data_vinculo, '%Y-%m') = ? ORDER BY data_vinculo ASC");
             $stmtContas->execute([$d['id'], $mes_filtro]);
             $contas_pessoa = $stmtContas->fetchAll();
 
@@ -234,7 +238,7 @@ $valor_total_mes = max(0, $valor_bruto_contas - $total_descontos_mes);
                         <thead>
                             <tr class="bg-slate-50 dark:bg-slate-800/50 font-black uppercase text-slate-400 tracking-widest">
                                 <th class="p-4">Data Vínculo</th>
-                                <th class="p-4">Nome Completo</th>
+                                <th class="p-4">Nome Completo / Composição</th>
                                 <th class="p-4">E-mail de Acesso</th>
                                 <th class="p-4 text-right">Custo</th>
                             </tr>
@@ -242,19 +246,35 @@ $valor_total_mes = max(0, $valor_bruto_contas - $total_descontos_mes);
                         <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
                             <?php foreach ($contas_pessoa as $c): 
                                 $deu_ruim = (int)$c['excluir_nota'] === 1;
+                                $val_perfil = $c['valor_perfil'] !== null ? (float)$c['valor_perfil'] : (float)$preco_unidade;
+                                $val_bm = ($c['bm_criada'] == 1) ? ($c['valor_bm'] !== null ? (float)$c['valor_bm'] : (float)$preco_bm) : 0;
+                                $val_pagina = ($c['pagina_criada'] == 1) ? ($c['valor_pagina'] !== null ? (float)$c['valor_pagina'] : (float)$preco_pagina) : 0;
+                                $valor_item = $val_perfil + $val_bm + $val_pagina;
                             ?>
                                 <tr class="<?= $deu_ruim ? 'opacity-40 line-through text-slate-450 dark:text-slate-500 bg-slate-50/30 dark:bg-slate-950/20' : '' ?>">
-                                    <td class="p-4 font-mono text-slate-400"><?= date('d/m/Y H:i', strtotime($c['data_vinculo'])) ?></td>
-                                    <td class="p-4 font-bold"><?= htmlspecialchars($c['nome'] . ' ' . $c['sobrenome']) ?></td>
-                                    <td class="p-4 font-bold text-blue-500 <?= $deu_ruim ? 'text-slate-450 dark:text-slate-500' : '' ?>"><?= htmlspecialchars($c['email']) ?></td>
-                                    <td class="p-4 text-right font-black">
+                                    <td class="p-4 font-mono text-slate-400 align-top"><?= date('d/m/Y H:i', strtotime($c['data_vinculo'])) ?></td>
+                                    <td class="p-4 font-bold align-top">
+                                        <div><?= htmlspecialchars($c['nome'] . ' ' . $c['sobrenome']) ?></div>
+                                        <div class="flex flex-wrap items-center gap-1.5 mt-1.5 no-line-through">
+                                            <span class="inline-flex items-center text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500">
+                                                Base: R$ <?= number_format($val_perfil, 2, ',', '.') ?>
+                                            </span>
+                                            <?php if ($c['bm_criada'] == 1): ?>
+                                                <span class="inline-flex items-center text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-300 border border-purple-200/50 dark:border-purple-800/50">
+                                                    + BM (R$ <?= number_format($val_bm, 2, ',', '.') ?>)
+                                                </span>
+                                            <?php endif; ?>
+                                            <?php if ($c['pagina_criada'] == 1): ?>
+                                                <span class="inline-flex items-center text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-300 border border-blue-200/50 dark:border-blue-800/50">
+                                                    + Pág (R$ <?= number_format($val_pagina, 2, ',', '.') ?>)
+                                                </span>
+                                            <?php endif; ?>
+                                        </div>
+                                    </td>
+                                    <td class="p-4 font-bold text-blue-500 align-top <?= $deu_ruim ? 'text-slate-450 dark:text-slate-500' : '' ?>"><?= htmlspecialchars($c['email']) ?></td>
+                                    <td class="p-4 text-right font-black align-top">
                                         <div class="flex items-center justify-end gap-2">
-                                            <?php
-                                                $valor_item = $preco_unidade;
-                                                if (isset($c['bm_criada']) && $c['bm_criada'] == 1) $valor_item += $preco_bm;
-                                                if (isset($c['pagina_criada']) && $c['pagina_criada'] == 1) $valor_item += $preco_pagina;
-                                            ?>
-                                            <span>R$ <?= $deu_ruim ? '0,00' : number_format($valor_item, 2, ',', '.') ?></span>
+                                            <span class="text-sm">R$ <?= $deu_ruim ? '0,00' : number_format($valor_item, 2, ',', '.') ?></span>
                                             <!-- Botão de Dar Baixa / Tirar da Nota (oculto no print) -->
                                             <form action="processa.php?acao=toggle_nota" method="POST" class="inline no-print ml-2">
                                                 <input type="hidden" name="acao" value="toggle_nota">

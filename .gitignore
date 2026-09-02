@@ -15,3 +15,6 @@ database_schema.sql
 # XAMPP/Local stuff
 create_user_temp.php
 update_user_temp.php
+
+# Documentacao pessoal local
+RELATORIO_FUNCIONAMENTO_LOCAL.md

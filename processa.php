@@ -275,10 +275,22 @@ switch ($acao) {
             if (count($idsArray) > 0) {
                 $in = str_repeat('?,', count($idsArray) - 1) . '?';
                 if ($pessoa_id) {
-                    $params = array_merge([$pessoa_id], $idsArray);
-                    $pdo->prepare("UPDATE contas SET destinada_a = ?, data_vinculo = NOW() WHERE id IN ($in)")->execute($params);
+                    $stmtConf = $pdo->query("SELECT preco_perfil, preco_bm, preco_pagina FROM configuracoes LIMIT 1");
+                    $cfg = $stmtConf->fetch();
+                    $preco_perfil = (float)($cfg['preco_perfil'] ?? 20.00);
+                    $preco_bm = (float)($cfg['preco_bm'] ?? 30.00);
+                    $preco_pagina = (float)($cfg['preco_pagina'] ?? 10.00);
+
+                    $params = array_merge([$pessoa_id, $pessoa_id, $preco_perfil, $preco_bm, $preco_pagina], $idsArray);
+                    $pdo->prepare("UPDATE contas SET 
+                        destinada_a = ?, 
+                        data_vinculo = IF(destinada_a IS NULL OR destinada_a != ?, NOW(), data_vinculo),
+                        valor_perfil = COALESCE(valor_perfil, ?),
+                        valor_bm = IF(bm_criada = 1, COALESCE(valor_bm, ?), valor_bm),
+                        valor_pagina = IF(pagina_criada = 1, COALESCE(valor_pagina, ?), valor_pagina)
+                        WHERE id IN ($in)")->execute($params);
                 } else {
-                    $pdo->prepare("UPDATE contas SET destinada_a = NULL, data_vinculo = NULL WHERE id IN ($in)")->execute($idsArray);
+                    $pdo->prepare("UPDATE contas SET destinada_a = NULL, data_vinculo = NULL, valor_perfil = NULL, valor_bm = NULL, valor_pagina = NULL WHERE id IN ($in)")->execute($idsArray);
                 }
                 
                 require_once 'cloudflare_helper.php';
@@ -550,9 +562,21 @@ switch ($acao) {
         $id = filter_input(INPUT_POST, 'conta_id', FILTER_VALIDATE_INT);
         $pessoa_id = filter_input(INPUT_POST, 'pessoa_id', FILTER_VALIDATE_INT) ?: null;
         if ($pessoa_id) {
-            $pdo->prepare("UPDATE contas SET destinada_a = ?, data_vinculo = NOW() WHERE id = ?")->execute([$pessoa_id, $id]);
+            $stmtConf = $pdo->query("SELECT preco_perfil, preco_bm, preco_pagina FROM configuracoes LIMIT 1");
+            $cfg = $stmtConf->fetch();
+            $preco_perfil = (float)($cfg['preco_perfil'] ?? 20.00);
+            $preco_bm = (float)($cfg['preco_bm'] ?? 30.00);
+            $preco_pagina = (float)($cfg['preco_pagina'] ?? 10.00);
+
+            $pdo->prepare("UPDATE contas SET 
+                destinada_a = ?, 
+                data_vinculo = IF(destinada_a IS NULL OR destinada_a != ?, NOW(), data_vinculo),
+                valor_perfil = COALESCE(valor_perfil, ?),
+                valor_bm = IF(bm_criada = 1, COALESCE(valor_bm, ?), valor_bm),
+                valor_pagina = IF(pagina_criada = 1, COALESCE(valor_pagina, ?), valor_pagina)
+                WHERE id = ?")->execute([$pessoa_id, $pessoa_id, $preco_perfil, $preco_bm, $preco_pagina, $id]);
         } else {
-            $pdo->prepare("UPDATE contas SET destinada_a = NULL, data_vinculo = NULL WHERE id = ?")->execute([$id]);
+            $pdo->prepare("UPDATE contas SET destinada_a = NULL, data_vinculo = NULL, valor_perfil = NULL, valor_bm = NULL, valor_pagina = NULL WHERE id = ?")->execute([$id]);
         }
         require_once 'cloudflare_helper.php';
         sincronizarRedirecionamentoConta($id, $pdo);
@@ -753,7 +777,9 @@ switch ($acao) {
     case 'criar_bm':
         $id = filter_input(INPUT_POST, 'conta_id', FILTER_VALIDATE_INT);
         if ($id) {
-            $pdo->prepare("UPDATE contas SET bm_criada = 1, data_bm_criada = NOW() WHERE id = ?")->execute([$id]);
+            $stmtConf = $pdo->query("SELECT preco_bm FROM configuracoes LIMIT 1");
+            $preco_bm = (float)($stmtConf->fetchColumn() ?: 30.00);
+            $pdo->prepare("UPDATE contas SET bm_criada = 1, data_bm_criada = NOW(), valor_bm = COALESCE(valor_bm, ?) WHERE id = ?")->execute([$preco_bm, $id]);
             sincronizarSlackTracker($pdo);
         }
         break;
@@ -761,14 +787,16 @@ switch ($acao) {
     case 'criar_pagina':
         $id = filter_input(INPUT_POST, 'conta_id', FILTER_VALIDATE_INT);
         if ($id) {
-            $pdo->prepare("UPDATE contas SET pagina_criada = 1, data_pagina_criada = NOW() WHERE id = ?")->execute([$id]);
+            $stmtConf = $pdo->query("SELECT preco_pagina FROM configuracoes LIMIT 1");
+            $preco_pagina = (float)($stmtConf->fetchColumn() ?: 10.00);
+            $pdo->prepare("UPDATE contas SET pagina_criada = 1, data_pagina_criada = NOW(), valor_pagina = COALESCE(valor_pagina, ?) WHERE id = ?")->execute([$preco_pagina, $id]);
         }
         break;
 
     case 'remover_bm':
         $id = filter_input(INPUT_POST, 'conta_id', FILTER_VALIDATE_INT);
         if ($id) {
-            $pdo->prepare("UPDATE contas SET bm_criada = 0, data_bm_criada = NULL WHERE id = ?")->execute([$id]);
+            $pdo->prepare("UPDATE contas SET bm_criada = 0, data_bm_criada = NULL, valor_bm = NULL WHERE id = ?")->execute([$id]);
             sincronizarSlackTracker($pdo);
         }
         break;
@@ -776,7 +804,7 @@ switch ($acao) {
     case 'remover_pagina':
         $id = filter_input(INPUT_POST, 'conta_id', FILTER_VALIDATE_INT);
         if ($id) {
-            $pdo->prepare("UPDATE contas SET pagina_criada = 0, data_pagina_criada = NULL WHERE id = ?")->execute([$id]);
+            $pdo->prepare("UPDATE contas SET pagina_criada = 0, data_pagina_criada = NULL, valor_pagina = NULL WHERE id = ?")->execute([$id]);
         }
         break;
 
@@ -868,6 +896,10 @@ switch ($acao) {
         $senha = trim($_POST['senha'] ?? '');
         $codigo_2fa = trim($_POST['codigo_2fa'] ?? '');
         $pessoa_id = filter_input(INPUT_POST, 'pessoa_id', FILTER_VALIDATE_INT) ?: null;
+
+        $valor_perfil = (isset($_POST['valor_perfil']) && $_POST['valor_perfil'] !== '') ? filter_input(INPUT_POST, 'valor_perfil', FILTER_VALIDATE_FLOAT) : null;
+        $valor_bm = (isset($_POST['valor_bm']) && $_POST['valor_bm'] !== '') ? filter_input(INPUT_POST, 'valor_bm', FILTER_VALIDATE_FLOAT) : null;
+        $valor_pagina = (isset($_POST['valor_pagina']) && $_POST['valor_pagina'] !== '') ? filter_input(INPUT_POST, 'valor_pagina', FILTER_VALIDATE_FLOAT) : null;
         
         if ($id) {
             // Verificar se o e-mail já está cadastrado em outra conta
@@ -880,19 +912,37 @@ switch ($acao) {
                 }
             }
 
-            $stmt = $pdo->prepare("SELECT status, destinada_a FROM contas WHERE id = ?");
+            $stmt = $pdo->prepare("SELECT status, destinada_a, bm_criada, pagina_criada, valor_perfil, valor_bm, valor_pagina FROM contas WHERE id = ?");
             $stmt->execute([$id]);
             $contaAtual = $stmt->fetch();
             $statusAtual = $contaAtual['status'] ?? '';
             $donoAnterior = $contaAtual['destinada_a'] ?? null;
+
+            if ($pessoa_id) {
+                $stmtConf = $pdo->query("SELECT preco_perfil, preco_bm, preco_pagina FROM configuracoes LIMIT 1");
+                $cfg = $stmtConf->fetch();
+                if ($valor_perfil === null) {
+                    $valor_perfil = $contaAtual['valor_perfil'] ?? (float)($cfg['preco_perfil'] ?? 20.00);
+                }
+                if ($contaAtual['bm_criada'] == 1 && $valor_bm === null) {
+                    $valor_bm = $contaAtual['valor_bm'] ?? (float)($cfg['preco_bm'] ?? 30.00);
+                }
+                if ($contaAtual['pagina_criada'] == 1 && $valor_pagina === null) {
+                    $valor_pagina = $contaAtual['valor_pagina'] ?? (float)($cfg['preco_pagina'] ?? 10.00);
+                }
+            } else {
+                $valor_perfil = null;
+                $valor_bm = null;
+                $valor_pagina = null;
+            }
             
             try {
                 if ($codigo_2fa !== '' && $statusAtual !== 'exportado') {
-                    $pdo->prepare("UPDATE contas SET nome = ?, sobrenome = ?, email = ?, username = ?, senha = ?, codigo_2fa = ?, destinada_a = ?, data_vinculo = IF(? IS NOT NULL AND ? != ?, NOW(), data_vinculo), status = 'autenticada', data_autenticacao = NOW() WHERE id = ?")
-                        ->execute([$nome, $sobrenome, $email, $username, $senha, $codigo_2fa, $pessoa_id, $pessoa_id, $pessoa_id, $donoAnterior, $id]);
+                    $pdo->prepare("UPDATE contas SET nome = ?, sobrenome = ?, email = ?, username = ?, senha = ?, codigo_2fa = ?, destinada_a = ?, data_vinculo = IF(? IS NOT NULL AND ? != ?, NOW(), data_vinculo), valor_perfil = ?, valor_bm = ?, valor_pagina = ?, status = 'autenticada', data_autenticacao = NOW() WHERE id = ?")
+                        ->execute([$nome, $sobrenome, $email, $username, $senha, $codigo_2fa, $pessoa_id, $pessoa_id, $donoAnterior, $valor_perfil, $valor_bm, $valor_pagina, $id]);
                 } else {
-                    $pdo->prepare("UPDATE contas SET nome = ?, sobrenome = ?, email = ?, username = ?, senha = ?, codigo_2fa = ?, destinada_a = ?, data_vinculo = IF(? IS NOT NULL AND ? != ?, NOW(), data_vinculo) WHERE id = ?")
-                        ->execute([$nome, $sobrenome, $email, $username, $senha, $codigo_2fa, $pessoa_id, $pessoa_id, $pessoa_id, $donoAnterior, $id]);
+                    $pdo->prepare("UPDATE contas SET nome = ?, sobrenome = ?, email = ?, username = ?, senha = ?, codigo_2fa = ?, destinada_a = ?, data_vinculo = IF(? IS NOT NULL AND ? != ?, NOW(), data_vinculo), valor_perfil = ?, valor_bm = ?, valor_pagina = ? WHERE id = ?")
+                        ->execute([$nome, $sobrenome, $email, $username, $senha, $codigo_2fa, $pessoa_id, $pessoa_id, $donoAnterior, $valor_perfil, $valor_bm, $valor_pagina, $id]);
                 }
                 
                 require_once 'cloudflare_helper.php';
@@ -905,6 +955,17 @@ switch ($acao) {
                     throw $e;
                 }
             }
+        }
+        break;
+
+    case 'editar_preco_conta':
+        $id = filter_input(INPUT_POST, 'conta_id', FILTER_VALIDATE_INT);
+        $v_perfil = (isset($_POST['valor_perfil']) && $_POST['valor_perfil'] !== '') ? filter_input(INPUT_POST, 'valor_perfil', FILTER_VALIDATE_FLOAT) : null;
+        $v_bm = (isset($_POST['valor_bm']) && $_POST['valor_bm'] !== '') ? filter_input(INPUT_POST, 'valor_bm', FILTER_VALIDATE_FLOAT) : null;
+        $v_pagina = (isset($_POST['valor_pagina']) && $_POST['valor_pagina'] !== '') ? filter_input(INPUT_POST, 'valor_pagina', FILTER_VALIDATE_FLOAT) : null;
+        if ($id) {
+            $pdo->prepare("UPDATE contas SET valor_perfil = ?, valor_bm = ?, valor_pagina = ? WHERE id = ?")
+                ->execute([$v_perfil, $v_bm, $v_pagina, $id]);
         }
         break;
 

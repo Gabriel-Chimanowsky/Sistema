@@ -68,6 +68,15 @@ try {
         if (!in_array('slack_bm_sync', $colunasContas)) {
             $pdo->query("ALTER TABLE contas ADD COLUMN slack_bm_sync TINYINT(1) NOT NULL DEFAULT 0");
         }
+        if (!in_array('valor_perfil', $colunasContas)) {
+            $pdo->query("ALTER TABLE contas ADD COLUMN valor_perfil DECIMAL(10,2) NULL DEFAULT NULL");
+        }
+        if (!in_array('valor_bm', $colunasContas)) {
+            $pdo->query("ALTER TABLE contas ADD COLUMN valor_bm DECIMAL(10,2) NULL DEFAULT NULL");
+        }
+        if (!in_array('valor_pagina', $colunasContas)) {
+            $pdo->query("ALTER TABLE contas ADD COLUMN valor_pagina DECIMAL(10,2) NULL DEFAULT NULL");
+        }
 
         // 2. Tabela configuracoes
         $stmtConf = $pdo->query("SHOW COLUMNS FROM configuracoes");
@@ -97,6 +106,19 @@ try {
         if (!in_array('cloudflare_dest_email', $colunasConf)) {
             $pdo->query("ALTER TABLE configuracoes ADD COLUMN cloudflare_dest_email VARCHAR(255) NULL");
         }
+
+        // Congelar e inicializar valores históricos das contas já vinculadas a clientes que ainda não possuem valores gravados
+        try {
+            $stmtInitConf = $pdo->query("SELECT preco_perfil, preco_bm, preco_pagina FROM configuracoes LIMIT 1");
+            $cfgInit = $stmtInitConf ? $stmtInitConf->fetch() : null;
+            $initPerfil = (float)($cfgInit['preco_perfil'] ?? 20.00);
+            $initBm = (float)($cfgInit['preco_bm'] ?? 30.00);
+            $initPagina = (float)($cfgInit['preco_pagina'] ?? 10.00);
+
+            $pdo->query("UPDATE contas SET valor_perfil = {$initPerfil} WHERE destinada_a IS NOT NULL AND data_vinculo IS NOT NULL AND valor_perfil IS NULL");
+            $pdo->query("UPDATE contas SET valor_bm = {$initBm} WHERE bm_criada = 1 AND destinada_a IS NOT NULL AND data_vinculo IS NOT NULL AND valor_bm IS NULL");
+            $pdo->query("UPDATE contas SET valor_pagina = {$initPagina} WHERE pagina_criada = 1 AND destinada_a IS NOT NULL AND data_vinculo IS NOT NULL AND valor_pagina IS NULL");
+        } catch (Exception $eInit) {}
         
 
         // 3. Tabela slack_listas
