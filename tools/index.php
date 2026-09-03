@@ -128,6 +128,16 @@ if (isFinanceiro()) {
                     <p class="text-xs text-slate-500 dark:text-slate-400">Remove entradas duplicadas de uma semana específica no Slack List e reseta o sincronismo para reconstruí-la corretamente.</p>
                 </a>
 
+                <a href="forcar_lote_slack.php" class="group bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 hover:border-purple-500 dark:hover:border-purple-600 hover:shadow-lg transition-all">
+                    <div class="flex items-center gap-3 mb-2">
+                        <div class="w-9 h-9 rounded-xl bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                            <i data-lucide="zap" class="w-4 h-4 text-purple-600 dark:text-purple-400"></i>
+                        </div>
+                        <span class="font-bold text-sm">Forçar Lote Parcial</span>
+                    </div>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Envia as contas e BMs pendentes para o Slack em lote parcial, mesmo que não tenham atingido 50 itens.</p>
+                </a>
+
             </div>
         </section>
 
