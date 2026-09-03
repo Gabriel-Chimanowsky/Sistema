@@ -1,6 +1,6 @@
 <?php
-require_once 'conexao.php';
-require_once 'auth.php';
+require_once __DIR__ . '/../conexao.php';
+require_once __DIR__ . '/../auth.php';
 checkAuth();
 
 $executar  = isset($_GET['executar'])  && $_GET['executar']  === '1';
@@ -90,7 +90,7 @@ $logCount = count($preview);
     <style>body { font-family: 'Inter', sans-serif; }</style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen">
-    <?php include 'navbar.php'; ?>
+    <?php include __DIR__ . '/../navbar.php'; ?>
 
     <main class="max-w-3xl mx-auto px-4 mt-28 pb-16 space-y-6">
 

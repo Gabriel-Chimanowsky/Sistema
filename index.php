@@ -3,7 +3,7 @@ require_once 'conexao.php';
 require_once 'auth.php';
 checkAuth();
 
-// Sincronização automática com Slack Lists
+// Sincronização automática com Slack Lists (disparada a cada carregamento do dashboard)
 sincronizarSlackTracker($pdo);
 
 if (isFinanceiro()) {
@@ -14,14 +14,6 @@ if (isFinanceiro()) {
 global $apiHerosms, $urlApi;
 $urlApi = 'https://hero-sms.com/stubs/handler_api.php';
 
-// Verificações de banco rápidas (migrações automáticas leves)
-try { $pdo->query("SELECT data_autenticacao FROM contas LIMIT 1"); } catch (Exception $e) { $pdo->query("ALTER TABLE contas ADD COLUMN data_autenticacao DATETIME NULL"); }
-try { $pdo->query("SELECT cookies FROM contas LIMIT 1"); } catch (Exception $e) { $pdo->query("ALTER TABLE contas ADD COLUMN cookies LONGTEXT NULL"); }
-try { $pdo->query("SELECT nota_conta FROM contas LIMIT 1"); } catch (Exception $e) { $pdo->query("ALTER TABLE contas ADD COLUMN nota_conta TEXT DEFAULT NULL"); }
-// Log imutável de tentativas de criação (nunca decrementado por deleções ou reversões)
-try { $pdo->query("SELECT id FROM log_criacao_contas LIMIT 1"); } catch (Exception $e) {
-    $pdo->query("CREATE TABLE IF NOT EXISTS log_criacao_contas (id INT AUTO_INCREMENT PRIMARY KEY, conta_id INT NOT NULL, criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, INDEX idx_criado_em (criado_em)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
-}
 
 // Processamento de ações AJAX/Post direto na index (legado mantido para compatibilidade, mas limpo)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao'])) {

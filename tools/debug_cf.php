@@ -1,6 +1,6 @@
 <?php
-require_once 'conexao.php';
-require_once 'auth.php';
+require_once __DIR__ . '/../conexao.php';
+require_once __DIR__ . '/../auth.php';
 checkAuth();
 
 // Fetch credentials

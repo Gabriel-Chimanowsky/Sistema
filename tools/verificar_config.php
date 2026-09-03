@@ -2,7 +2,9 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-require_once "conexao.php";
+require_once __DIR__ . '/../conexao.php';
+require_once __DIR__ . '/../auth.php';
+checkAuth();
 
 echo "<h2>Diagnostico de Producao do Slack</h2>";
 

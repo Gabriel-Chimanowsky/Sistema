@@ -100,7 +100,9 @@ switch ($acao) {
         // diretamente no XML via ZipArchive, preservando todos os estilos
         // e metadados que o ixBrowser valida.
         // ---------------------------------------------------------------
-        $templatePath = __DIR__ . '/excel exemplo/Import_template.xlsx';
+        $templatePath = file_exists(__DIR__ . '/templates/Import_template.xlsx') 
+            ? __DIR__ . '/templates/Import_template.xlsx' 
+            : __DIR__ . '/excel exemplo/Import_template.xlsx';
         $tmpFile = tempnam(sys_get_temp_dir(), 'ixb_') . '.xlsx';
         copy($templatePath, $tmpFile);
 

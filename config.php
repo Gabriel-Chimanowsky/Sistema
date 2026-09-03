@@ -217,6 +217,20 @@ $config = $stmt->fetch();
         </form>
     </div>
 
+    <!-- Link para Central de Ferramentas -->
+    <div class="max-w-[1000px] mx-auto px-4 mt-6">
+        <a href="tools/index.php" class="flex items-center gap-3 p-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl hover:border-amber-400 dark:hover:border-amber-600 transition-all group">
+            <div class="w-10 h-10 bg-amber-100 dark:bg-amber-900/30 rounded-xl flex items-center justify-center flex-shrink-0">
+                <i data-lucide="wrench" class="w-5 h-5 text-amber-600 dark:text-amber-400"></i>
+            </div>
+            <div>
+                <div class="font-bold text-sm">Central de Ferramentas e Diagnósticos</div>
+                <div class="text-xs text-slate-500 dark:text-slate-400">Acesse diagnósticos do Slack, Cloudflare, reconstrução de listas e operações avançadas de banco de dados.</div>
+            </div>
+            <i data-lucide="chevron-right" class="w-5 h-5 text-slate-400 group-hover:text-amber-500 transition ml-auto"></i>
+        </a>
+    </div>
+
     <!-- Toast Notification -->
     <div id="toast" class="fixed bottom-24 right-8 bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-6 py-4 rounded-2xl shadow-2xl font-bold flex items-center gap-3 transform translate-y-32 opacity-0 transition-all z-50">
         <div class="w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center text-white"><i data-lucide="check" class="w-4 h-4"></i></div>

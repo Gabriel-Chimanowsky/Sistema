@@ -1,11 +1,11 @@
 <?php
-require_once 'conexao.php';
-require_once 'auth.php';
+require_once __DIR__ . '/../conexao.php';
+require_once __DIR__ . '/../auth.php';
 checkAuth();
 
-$logFile = __DIR__ . '/cloudflare_api_debug.log';
-$helperFile = __DIR__ . '/cloudflare_helper.php';
-$processaFile = __DIR__ . '/processa.php';
+$logFile    = dirname(__DIR__) . '/cloudflare_api_debug.log';
+$helperFile = dirname(__DIR__) . '/cloudflare_helper.php';
+$processaFile = dirname(__DIR__) . '/processa.php';
 
 $mensagemAcao = '';
 
