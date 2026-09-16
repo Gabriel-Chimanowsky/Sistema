@@ -46,7 +46,7 @@ if (!function_exists('executarMigracoes')) {
             
             $colunasParaAdicionarConf = [
                 'slack_token'             => 'ALTER TABLE configuracoes ADD COLUMN slack_token VARCHAR(255) NULL',
-                'slack_canal_notificacao' => 'ALTER TABLE configuracoes ADD COLUMN slack_canal_notificacao VARCHAR(100) NULL',
+                'slack_canal_notificacao' => 'ALTER TABLE configuracoes ADD COLUMN slack_canal_notificacao TEXT NULL',
                 'preco_perfil'            => 'ALTER TABLE configuracoes ADD COLUMN preco_perfil DECIMAL(10,2) NOT NULL DEFAULT 20.00',
                 'preco_bm'                => 'ALTER TABLE configuracoes ADD COLUMN preco_bm DECIMAL(10,2) NOT NULL DEFAULT 30.00',
                 'preco_pagina'            => 'ALTER TABLE configuracoes ADD COLUMN preco_pagina DECIMAL(10,2) NOT NULL DEFAULT 10.00',
@@ -59,6 +59,13 @@ if (!function_exists('executarMigracoes')) {
                 if (!in_array($col, $colunasConf)) {
                     $pdo->query($sql);
                 }
+            }
+
+            // Garante que slack_canal_notificacao seja TEXT para múltiplos destinatários
+            try {
+                $pdo->query("ALTER TABLE configuracoes MODIFY COLUMN slack_canal_notificacao TEXT NULL");
+            } catch (Exception $e) {
+                // Ignora se já estiver alterado ou tabela não compatível
             }
 
             // 3. Tabela slack_listas

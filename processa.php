@@ -726,15 +726,85 @@ switch ($acao) {
         break;
 
     case 'atualizar_config':
+        $destinatariosNormalizados = implode(', ', obterDestinatariosSlack($_POST['slack_canal_notificacao'] ?? ''));
         $sql = "UPDATE configuracoes SET senha_padrao = ?, email_contador = ?, genero_padrao = ?, pais_padrao = ?, email_prefixo = ?, email_dominio = ?, slack_token = ?, slack_canal_notificacao = ?, preco_perfil = ?, preco_bm = ?, preco_pagina = ?, cloudflare_token = ?, cloudflare_zone_id = ?, cloudflare_dest_email = ?";
         $pdo->prepare($sql)->execute([
             $_POST['senha_padrao'], $_POST['email_contador'], $_POST['genero_padrao'], 
             $_POST['pais_padrao'], $_POST['email_prefixo'], $_POST['email_dominio'],
-            $_POST['slack_token'], $_POST['slack_canal_notificacao'],
+            $_POST['slack_token'], $destinatariosNormalizados,
             $_POST['preco_perfil'], $_POST['preco_bm'], $_POST['preco_pagina'],
             $_POST['cloudflare_token'], $_POST['cloudflare_zone_id'], $_POST['cloudflare_dest_email']
         ]);
         break;
+
+    case 'salvar_destinatarios_slack':
+        header('Content-Type: application/json');
+        try {
+            $destinatariosRaw = $_POST['destinatarios'] ?? '';
+            $token = trim($_POST['token'] ?? '');
+            
+            $destinatariosLimpos = implode(', ', obterDestinatariosSlack($destinatariosRaw));
+            
+            if (!empty($token)) {
+                $sql = "UPDATE configuracoes SET slack_canal_notificacao = ?, slack_token = ?";
+                $pdo->prepare($sql)->execute([$destinatariosLimpos, $token]);
+            } else {
+                $sql = "UPDATE configuracoes SET slack_canal_notificacao = ?";
+                $pdo->prepare($sql)->execute([$destinatariosLimpos]);
+            }
+            
+            echo json_encode([
+                'sucesso' => true,
+                'mensagem' => 'Destinatários de alertas do Slack salvos com sucesso!',
+                'destinatarios' => obterDestinatariosSlack($destinatariosLimpos),
+                'destinatarios_str' => $destinatariosLimpos
+            ]);
+        } catch (Exception $e) {
+            echo json_encode(['sucesso' => false, 'erro' => 'Erro ao salvar destinatários: ' . $e->getMessage()]);
+        }
+        exit;
+
+    case 'testar_slack_alerta':
+        header('Content-Type: application/json');
+        try {
+            if (isset($_POST['destinatarios']) && trim($_POST['destinatarios']) !== '') {
+                $destinatariosLimpos = implode(', ', obterDestinatariosSlack($_POST['destinatarios']));
+                $pdo->prepare("UPDATE configuracoes SET slack_canal_notificacao = ?")->execute([$destinatariosLimpos]);
+            }
+            if (isset($_POST['token']) && trim($_POST['token']) !== '') {
+                $pdo->prepare("UPDATE configuracoes SET slack_token = ?")->execute([trim($_POST['token'])]);
+            }
+            
+            $resultado = testarNotificacaoSlack($pdo);
+            echo json_encode($resultado);
+        } catch (Exception $e) {
+            echo json_encode([
+                'sucesso' => false,
+                'mensagem' => 'Erro ao executar teste de alerta: ' . $e->getMessage(),
+                'total' => 0,
+                'enviados' => 0,
+                'falhas' => 0,
+                'detalhes' => []
+            ]);
+        }
+        exit;
+
+    case 'listar_membros_slack':
+        header('Content-Type: application/json');
+        try {
+            $stmtConf = $pdo->query("SELECT slack_token FROM configuracoes LIMIT 1");
+            $config = $stmtConf->fetch();
+            $token = $config['slack_token'] ?? '';
+            if (empty($token)) {
+                echo json_encode(['sucesso' => false, 'membros' => []]);
+                exit;
+            }
+            $membros = obterMembrosSlackWorkspace($token);
+            echo json_encode(['sucesso' => true, 'membros' => $membros]);
+        } catch (Exception $e) {
+            echo json_encode(['sucesso' => false, 'membros' => [], 'erro' => $e->getMessage()]);
+        }
+        exit;
 
     case 'salvar_cloudflare_config':
         header('Content-Type: application/json');

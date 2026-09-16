@@ -231,7 +231,18 @@ if (!empty($token)) {
     }
 }
 
-// 3. Buscar listas do banco de dados local
+// 3. Obter destinatários dos alertas e membros do Slack
+$destinatariosConfigurados = obterDestinatariosSlack($canal);
+$membrosWorkspace = [];
+if (!empty($token) && $conexao_ok) {
+    $membrosWorkspace = obterMembrosSlackWorkspace($token);
+}
+$membrosPorId = [];
+foreach ($membrosWorkspace as $m) {
+    $membrosPorId[$m['id']] = $m;
+}
+
+// 4. Buscar listas do banco de dados local
 $listas = $pdo->query("SELECT * FROM slack_listas ORDER BY criado_em DESC")->fetchAll();
 ?>
 <!DOCTYPE html>
@@ -348,6 +359,124 @@ $listas = $pdo->query("SELECT * FROM slack_listas ORDER BY criado_em DESC")->fet
                     <a href="config.php" class="text-xs font-semibold text-blue-500 hover:underline">Configurar Token</a>
                 <?php endif; ?>
             </div>
+        </div>
+
+        <!-- Card de Notificações e Destinatários dos Alertas dos Apps -->
+        <div class="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-6">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-5">
+                <div class="flex items-center gap-3">
+                    <div class="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-2xl flex items-center justify-center text-purple-600 dark:text-purple-400 flex-shrink-0">
+                        <i data-lucide="bell-ring" class="w-6 h-6"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h2 class="font-bold text-lg text-slate-900 dark:text-white">Destinatários dos Alertas dos Apps</h2>
+                            <span id="badgeTotalDest" class="text-xs px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 dark:bg-purple-950/40 dark:text-purple-300 font-extrabold"><?= count($destinatariosConfigurados) ?> ativo(s)</span>
+                        </div>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">
+                            Pessoas e canais que recebem notificações automáticas de <strong>queda de app</strong>, <strong>retorno online</strong> e <strong>aprovação Meta</strong>.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <button type="button" id="btnTestarSlackPainel" onclick="testarAlertasPainel()" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white transition shadow-md shadow-purple-600/20 active:scale-95 cursor-pointer">
+                        <i data-lucide="send" id="iconTestarSlackPainel" class="w-4 h-4"></i>
+                        <span id="textTestarSlackPainel">Disparar Alerta de Teste</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Lista de Destinatários Ativos -->
+            <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Quem recebe os alertas atualmente:</span>
+                    <span class="text-xs text-slate-400">Clique no <span class="text-red-500 font-bold">×</span> para remover um destinatário</span>
+                </div>
+
+                <div id="listaDestinatariosCards" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                    <?php if (empty($destinatariosConfigurados)): ?>
+                        <div id="msgSemDestinatarios" class="col-span-full p-6 text-center rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 text-slate-400 text-xs font-medium">
+                            <i data-lucide="user-x" class="w-6 h-6 mx-auto mb-1 opacity-50"></i>
+                            Nenhuma pessoa ou canal configurado. Use os campos abaixo para adicionar.
+                        </div>
+                    <?php else: ?>
+                        <?php foreach ($destinatariosConfigurados as $destId): ?>
+                            <?php 
+                                $isUser = str_starts_with($destId, 'U') || str_starts_with($destId, 'W');
+                                $isChannel = str_starts_with($destId, 'C') || str_starts_with($destId, '#') || str_starts_with($destId, 'G');
+                                $membroInfo = $membrosPorId[$destId] ?? null;
+                                $nomeExibicao = $membroInfo ? $membroInfo['real_name'] : ($isChannel ? 'Canal do Slack' : 'Usuário / Destinatário');
+                                $avatar = $membroInfo['avatar'] ?? null;
+                            ?>
+                            <div class="destinatario-card relative flex items-center gap-3 p-3.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 rounded-2xl group transition-all hover:border-purple-300 dark:hover:border-purple-800" data-id="<?= htmlspecialchars($destId) ?>">
+                                <?php if ($avatar): ?>
+                                    <img src="<?= htmlspecialchars($avatar) ?>" alt="<?= htmlspecialchars($nomeExibicao) ?>" class="w-9 h-9 rounded-xl flex-shrink-0 object-cover border border-slate-200 dark:border-slate-700">
+                                <?php else: ?>
+                                    <div class="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm flex-shrink-0 <?= $isUser ? 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' ?>">
+                                        <?= $isUser ? '👤' : '💬' ?>
+                                    </div>
+                                <?php endif; ?>
+                                <div class="flex-1 min-w-0 pr-6">
+                                    <div class="font-bold text-xs text-slate-800 dark:text-slate-200 truncate"><?= htmlspecialchars($nomeExibicao) ?></div>
+                                    <div class="font-mono text-[11px] text-slate-400 dark:text-slate-500 truncate"><?= htmlspecialchars($destId) ?></div>
+                                </div>
+                                <button type="button" onclick="removerDestinatario('<?= htmlspecialchars($destId) ?>')" title="Remover dos alertas" class="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-lg bg-red-100 hover:bg-red-200 text-red-600 dark:bg-red-950/50 dark:hover:bg-red-900/60 dark:text-red-400 flex items-center justify-center transition active:scale-90 cursor-pointer">
+                                    <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                                </button>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </div>
+            </div>
+
+            <!-- Adicionar Mais Pessoas -->
+            <div class="bg-slate-50 dark:bg-slate-950/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-4">
+                <div class="font-bold text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                    <i data-lucide="user-plus" class="w-4 h-4 text-purple-600"></i>
+                    Adicionar Nova Pessoa ou Canal:
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+                    <?php if (!empty($membrosWorkspace)): ?>
+                        <div class="md:col-span-6">
+                            <label class="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1">Selecionar Membro do Workspace:</label>
+                            <select id="selectMembroWorkspace" class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs font-semibold outline-none focus:border-purple-500 cursor-pointer">
+                                <option value="">-- Escolha um membro do Slack --</option>
+                                <?php foreach ($membrosWorkspace as $m): ?>
+                                    <option value="<?= htmlspecialchars($m['id']) ?>" data-nome="<?= htmlspecialchars($m['real_name']) ?>" data-avatar="<?= htmlspecialchars($m['avatar']) ?>">
+                                        <?= htmlspecialchars($m['real_name']) ?> (ID: <?= htmlspecialchars($m['id']) ?>)
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="md:col-span-4">
+                            <label class="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1">Ou Digite um ID/Canal Manual:</label>
+                            <input type="text" id="inputDestinatarioManual" placeholder="Ex: U01234567 ou #canal" class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs font-mono font-semibold outline-none focus:border-purple-500">
+                        </div>
+                    <?php else: ?>
+                        <div class="md:col-span-10">
+                            <label class="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1">ID do Membro (U...) ou Canal (C... ou #canal):</label>
+                            <input type="text" id="inputDestinatarioManual" placeholder="Ex: U0123456789, U0987654321, #alertas..." class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs font-mono font-semibold outline-none focus:border-purple-500">
+                        </div>
+                    <?php endif; ?>
+
+                    <div class="md:col-span-2 pt-4 md:pt-0">
+                        <button type="button" onclick="adicionarDestinatario()" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-2.5 px-4 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-md shadow-purple-600/20 active:scale-95 cursor-pointer">
+                            <i data-lucide="plus" class="w-4 h-4"></i>
+                            Adicionar
+                        </button>
+                    </div>
+                </div>
+
+                <div class="text-[11px] text-slate-400 flex items-center gap-2">
+                    <i data-lucide="info" class="w-3.5 h-3.5 text-purple-500 flex-shrink-0"></i>
+                    <span>Para pegar o ID de uma pessoa no Slack: perfil da pessoa &gt; botão "..." &gt; <strong>Copiar ID do membro</strong>.</span>
+                </div>
+            </div>
+
+            <!-- Relatório do Teste de Alerta -->
+            <div id="painelResultadoTeste" class="hidden p-4 rounded-2xl text-xs font-semibold space-y-2"></div>
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -509,9 +638,250 @@ $listas = $pdo->query("SELECT * FROM slack_listas ORDER BY criado_em DESC")->fet
 
     </main>
 
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-24 right-8 bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-6 py-4 rounded-2xl shadow-2xl font-bold flex items-center gap-3 transform translate-y-32 opacity-0 transition-all z-50">
+        <div id="toastIcon" class="w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center text-white"><i data-lucide="check" class="w-4 h-4"></i></div>
+        <span id="toastMsg"></span>
+    </div>
+
     <script>
         // Inicializa ícones Lucide
         lucide.createIcons();
+
+        // Dados de destinatários e membros
+        let destinatariosAtivos = <?= json_encode(array_values($destinatariosConfigurados)) ?>;
+        const membrosMap = <?= json_encode($membrosPorId) ?>;
+
+        function showSlackToast(msg, isError = false) {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toastMsg');
+            const toastIcon = document.getElementById('toastIcon');
+            
+            toastMsg.textContent = msg;
+            if (isError) {
+                toastIcon.className = 'w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white';
+                toastIcon.innerHTML = '<i data-lucide="x" class="w-4 h-4"></i>';
+            } else {
+                toastIcon.className = 'w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center text-white';
+                toastIcon.innerHTML = '<i data-lucide="check" class="w-4 h-4"></i>';
+            }
+            lucide.createIcons();
+            
+            toast.classList.remove('translate-y-32', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-32', 'opacity-0');
+            }, 3500);
+        }
+
+        function renderizarDestinatarios() {
+            const container = document.getElementById('listaDestinatariosCards');
+            const badgeTotal = document.getElementById('badgeTotalDest');
+            if (badgeTotal) {
+                badgeTotal.textContent = `${destinatariosAtivos.length} ativo(s)`;
+            }
+
+            if (!container) return;
+            container.innerHTML = '';
+
+            if (destinatariosAtivos.length === 0) {
+                container.innerHTML = `
+                    <div id="msgSemDestinatarios" class="col-span-full p-6 text-center rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 text-slate-400 text-xs font-medium">
+                        <i data-lucide="user-x" class="w-6 h-6 mx-auto mb-1 opacity-50"></i>
+                        Nenhuma pessoa ou canal configurado. Adicione acima para começar a receber alertas.
+                    </div>
+                `;
+                lucide.createIcons();
+                return;
+            }
+
+            destinatariosAtivos.forEach(destId => {
+                const isUser = destId.startsWith('U') || destId.startsWith('W');
+                const isChannel = destId.startsWith('C') || destId.startsWith('#') || destId.startsWith('G');
+                const membro = membrosMap[destId];
+                const nomeExibicao = membro ? membro.real_name : (isChannel ? 'Canal do Slack' : 'Usuário / Destinatário');
+                const avatar = membro ? membro.avatar : null;
+
+                const card = document.createElement('div');
+                card.className = 'destinatario-card relative flex items-center gap-3 p-3.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 rounded-2xl group transition-all hover:border-purple-300 dark:hover:border-purple-800';
+                card.setAttribute('data-id', destId);
+
+                let avatarHtml = '';
+                if (avatar) {
+                    avatarHtml = `<img src="${avatar}" alt="${nomeExibicao}" class="w-9 h-9 rounded-xl flex-shrink-0 object-cover border border-slate-200 dark:border-slate-700">`;
+                } else {
+                    const iconColor = isUser ? 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300';
+                    avatarHtml = `<div class="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm flex-shrink-0 ${iconColor}">${isUser ? '👤' : '💬'}</div>`;
+                }
+
+                card.innerHTML = `
+                    ${avatarHtml}
+                    <div class="flex-1 min-w-0 pr-6">
+                        <div class="font-bold text-xs text-slate-800 dark:text-slate-200 truncate">${nomeExibicao}</div>
+                        <div class="font-mono text-[11px] text-slate-400 dark:text-slate-500 truncate">${destId}</div>
+                    </div>
+                    <button type="button" onclick="removerDestinatario('${destId}')" title="Remover dos alertas" class="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-lg bg-red-100 hover:bg-red-200 text-red-600 dark:bg-red-950/50 dark:hover:bg-red-900/60 dark:text-red-400 flex items-center justify-center transition active:scale-90 cursor-pointer">
+                        <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                    </button>
+                `;
+                container.appendChild(card);
+            });
+
+            lucide.createIcons();
+        }
+
+        async function salvarDestinatariosServidor() {
+            try {
+                const formData = new FormData();
+                formData.append('acao', 'salvar_destinatarios_slack');
+                formData.append('destinatarios', destinatariosAtivos.join(', '));
+
+                const resp = await fetch('processa.php', {
+                    method: 'POST',
+                    body: formData
+                });
+                const res = await resp.json();
+                if (res.sucesso) {
+                    showSlackToast('Destinatários atualizados no sistema!');
+                } else {
+                    showSlackToast(res.erro || 'Erro ao salvar alterações.', true);
+                }
+            } catch (err) {
+                showSlackToast('Erro de conexão ao salvar.', true);
+            }
+        }
+
+        function adicionarDestinatario() {
+            const selectMembro = document.getElementById('selectMembroWorkspace');
+            const inputManual = document.getElementById('inputDestinatarioManual');
+
+            let valorAdicionar = '';
+
+            if (selectMembro && selectMembro.value) {
+                valorAdicionar = selectMembro.value;
+                selectMembro.value = '';
+            } else if (inputManual && inputManual.value.trim()) {
+                valorAdicionar = inputManual.value.trim();
+                inputManual.value = '';
+            }
+
+            if (!valorAdicionar) {
+                showSlackToast('Selecione um membro ou digite um ID para adicionar.', true);
+                return;
+            }
+
+            // Suporta múltiplos inseridos juntos (separados por vírgula ou espaço)
+            const novos = valorAdicionar.split(/[\r\n,;\s]+/)
+                .map(s => s.trim().replace(/^["']|["']$/g, ''))
+                .filter(s => s.length > 0);
+
+            let adicionouAlgum = false;
+            novos.forEach(novoId => {
+                if (!destinatariosAtivos.includes(novoId)) {
+                    destinatariosAtivos.push(novoId);
+                    adicionouAlgum = true;
+                }
+            });
+
+            if (adicionouAlgum) {
+                renderizarDestinatarios();
+                salvarDestinatariosServidor();
+            } else {
+                showSlackToast('Este destinatário já está na lista.', true);
+            }
+        }
+
+        function removerDestinatario(id) {
+            destinatariosAtivos = destinatariosAtivos.filter(d => d !== id);
+            renderizarDestinatarios();
+            salvarDestinatariosServidor();
+        }
+
+        async function testarAlertasPainel() {
+            const btn = document.getElementById('btnTestarSlackPainel');
+            const texto = document.getElementById('textTestarSlackPainel');
+            const icon = document.getElementById('iconTestarSlackPainel');
+            const painel = document.getElementById('painelResultadoTeste');
+
+            if (destinatariosAtivos.length === 0) {
+                showSlackToast('Adicione pelo menos 1 destinatário para testar.', true);
+                return;
+            }
+
+            btn.disabled = true;
+            btn.classList.add('opacity-70', 'cursor-not-allowed');
+            texto.textContent = `Enviando para ${destinatariosAtivos.length}...`;
+            icon.setAttribute('data-lucide', 'loader');
+            icon.classList.add('animate-spin');
+            lucide.createIcons();
+
+            painel.classList.add('hidden');
+            painel.innerHTML = '';
+
+            try {
+                const formData = new FormData();
+                formData.append('acao', 'testar_slack_alerta');
+                formData.append('destinatarios', destinatariosAtivos.join(', '));
+
+                const resp = await fetch('processa.php', {
+                    method: 'POST',
+                    body: formData
+                });
+                const dados = await resp.json();
+
+                painel.classList.remove('hidden');
+
+                if (dados.sucesso) {
+                    painel.className = 'p-4 rounded-2xl text-xs font-semibold space-y-2 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900';
+                    let html = `<div class="flex items-center gap-2 font-bold text-sm"><i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-500"></i> ${dados.mensagem}</div>`;
+                    
+                    if (dados.detalhes && dados.detalhes.length > 0) {
+                        html += '<div class="pt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">';
+                        dados.detalhes.forEach(d => {
+                            const membro = membrosMap[d.destinatario];
+                            const nome = membro ? membro.real_name : d.destinatario;
+                            if (d.ok) {
+                                html += `<div class="p-2 bg-white/60 dark:bg-slate-900/60 rounded-xl border border-emerald-200/50 flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400">
+                                    <span>✅</span> <strong>${nome}</strong> (${d.destinatario})
+                                </div>`;
+                            } else {
+                                html += `<div class="p-2 bg-white/60 dark:bg-slate-900/60 rounded-xl border border-red-200/50 flex items-center gap-1.5 text-red-600 dark:text-red-400">
+                                    <span>❌</span> <strong>${nome}</strong>: ${d.erro}
+                                </div>`;
+                            }
+                        });
+                        html += '</div>';
+                    }
+                    painel.innerHTML = html;
+                    showSlackToast(`Alerta de teste enviado! (${dados.enviados}/${dados.total})`);
+                } else {
+                    painel.className = 'p-4 rounded-2xl text-xs font-semibold space-y-2 bg-red-50 dark:bg-red-950/30 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-900';
+                    let html = `<div class="flex items-center gap-2 font-bold text-sm"><i data-lucide="alert-triangle" class="w-4 h-4 text-red-500"></i> ${dados.mensagem || 'Falha ao disparar alertas de teste.'}</div>`;
+                    if (dados.detalhes && dados.detalhes.length > 0) {
+                        html += '<div class="pt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">';
+                        dados.detalhes.forEach(d => {
+                            html += `<div class="p-2 bg-white/60 dark:bg-slate-900/60 rounded-xl border border-red-200/50 flex items-center gap-1.5 text-red-600 dark:text-red-400">
+                                <span>❌</span> <strong>${d.destinatario}</strong>: ${d.erro || 'Erro'}
+                            </div>`;
+                        });
+                        html += '</div>';
+                    }
+                    painel.innerHTML = html;
+                    showSlackToast('Falha no teste de alertas.', true);
+                }
+            } catch (err) {
+                painel.classList.remove('hidden');
+                painel.className = 'p-4 rounded-2xl text-xs font-semibold bg-red-50 dark:bg-red-950/30 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-900';
+                painel.textContent = 'Erro ao se comunicar com o servidor: ' + err.message;
+                showSlackToast('Erro de comunicação.', true);
+            } finally {
+                btn.disabled = false;
+                btn.classList.remove('opacity-70', 'cursor-not-allowed');
+                texto.textContent = 'Disparar Alerta de Teste';
+                icon.setAttribute('data-lucide', 'send');
+                icon.classList.remove('animate-spin');
+                lucide.createIcons();
+            }
+        }
 
         // Carrega dinamicamente itens pai quando a lista selecionada for alterada
         async function carregarItensPai(listId) {

@@ -40,23 +40,27 @@ try {
         echo "<pre><b>auth.test response:</b>\n" . print_r($res, true) . "</pre>";
         
         if (isset($res['ok']) && $res['ok']) {
-            if (!empty($canal)) {
-                $chMsg = curl_init("https://slack.com/api/chat.postMessage");
-                curl_setopt($chMsg, CURLOPT_RETURNTRANSFER, true);
-                curl_setopt($chMsg, CURLOPT_POST, true);
-                curl_setopt($chMsg, CURLOPT_HTTPHEADER, [
-                    "Authorization: Bearer " . $token,
-                    "Content-Type: application/json; charset=utf-8"
-                ]);
-                curl_setopt($chMsg, CURLOPT_POSTFIELDS, json_encode([
-                    "channel" => $canal,
-                    "text" => "Teste de conexao do sistema em " . date('d/m/Y H:i:s')
-                ]));
-                $resMsg = json_decode(curl_exec($chMsg), true);
-                curl_close($chMsg);
-                echo "<pre><b>chat.postMessage response:</b>\n" . print_r($resMsg, true) . "</pre>";
+            $destinatarios = obterDestinatariosSlack($canal);
+            if (!empty($destinatarios)) {
+                echo "<p><b>Destinatários encontrados (" . count($destinatarios) . "):</b> " . implode(', ', $destinatarios) . "</p>";
+                foreach ($destinatarios as $dest) {
+                    $chMsg = curl_init("https://slack.com/api/chat.postMessage");
+                    curl_setopt($chMsg, CURLOPT_RETURNTRANSFER, true);
+                    curl_setopt($chMsg, CURLOPT_POST, true);
+                    curl_setopt($chMsg, CURLOPT_HTTPHEADER, [
+                        "Authorization: Bearer " . $token,
+                        "Content-Type: application/json; charset=utf-8"
+                    ]);
+                    curl_setopt($chMsg, CURLOPT_POSTFIELDS, json_encode([
+                        "channel" => $dest,
+                        "text" => "Teste de conexao do sistema para {$dest} em " . date('d/m/Y H:i:s')
+                    ]));
+                    $resMsg = json_decode(curl_exec($chMsg), true);
+                    curl_close($chMsg);
+                    echo "<pre><b>chat.postMessage [{$dest}] response:</b>\n" . print_r($resMsg, true) . "</pre>";
+                }
             } else {
-                echo "<p style='color:orange;'>Aviso: slack_canal_notificacao esta vazio.</p>";
+                echo "<p style='color:orange;'>Aviso: nenhum destinatário configurado em slack_canal_notificacao.</p>";
             }
         }
     }

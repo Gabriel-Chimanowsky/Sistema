@@ -172,19 +172,22 @@ if (!function_exists('sincronizarSlackTracker')) {
 
                     $msg = "📅 *Nova lista do mês criada:* <{$list_link}|{$list_name}>";
 
-                    $chMsg = curl_init("https://slack.com/api/chat.postMessage");
-                    curl_setopt($chMsg, CURLOPT_RETURNTRANSFER, true);
-                    curl_setopt($chMsg, CURLOPT_POST, true);
-                    curl_setopt($chMsg, CURLOPT_HTTPHEADER, [
-                        "Authorization: Bearer " . $token,
-                        "Content-Type: application/json; charset=utf-8"
-                    ]);
-                    curl_setopt($chMsg, CURLOPT_POSTFIELDS, json_encode([
-                        "channel" => $canal,
-                        "text" => $msg
-                    ]));
-                    curl_exec($chMsg);
-                    curl_close($chMsg);
+                    $destinatariosTracker = obterDestinatariosSlack($canal);
+                    foreach ($destinatariosTracker as $destC) {
+                        $chMsg = curl_init("https://slack.com/api/chat.postMessage");
+                        curl_setopt($chMsg, CURLOPT_RETURNTRANSFER, true);
+                        curl_setopt($chMsg, CURLOPT_POST, true);
+                        curl_setopt($chMsg, CURLOPT_HTTPHEADER, [
+                            "Authorization: Bearer " . $token,
+                            "Content-Type: application/json; charset=utf-8"
+                        ]);
+                        curl_setopt($chMsg, CURLOPT_POSTFIELDS, json_encode([
+                            "channel" => $destC,
+                            "text" => $msg
+                        ]));
+                        curl_exec($chMsg);
+                        curl_close($chMsg);
+                    }
                 }
             }
 
@@ -367,36 +370,220 @@ if (!function_exists('sincronizarSlackTracker')) {
     }
 }
 
+if (!function_exists('obterDestinatariosSlack')) {
+    /**
+     * Extrai e limpa a lista de destinatários (IDs de membros ou canais) a partir de uma string bruta
+     * Suporta separadores: vírgula, ponto-e-vírgula, quebra de linha ou espaço
+     */
+    function obterDestinatariosSlack($canaisRaw) {
+        if (empty($canaisRaw) || !is_string($canaisRaw)) {
+            return [];
+        }
+        $partes = preg_split('/[\r\n,;\s]+/', trim($canaisRaw));
+        $destinatarios = [];
+        foreach ($partes as $p) {
+            $p = trim($p);
+            $p = trim($p, '"\' ');
+            if (!empty($p)) {
+                $destinatarios[] = $p;
+            }
+        }
+        return array_values(array_unique($destinatarios));
+    }
+}
+
 if (!function_exists('enviarNotificacaoSlack')) {
-    function enviarNotificacaoSlack($pdo, $mensagem) {
+    /**
+     * Envia notificação para todos os destinatários configurados (canais e/ou IDs de usuários)
+     */
+    function enviarNotificacaoSlack($pdo, $mensagem, $destinatariosManual = null) {
         try {
             $stmtConf = $pdo->query("SELECT slack_token, slack_canal_notificacao FROM configuracoes LIMIT 1");
             $config = $stmtConf->fetch();
-            if (!$config || empty($config['slack_token']) || empty($config['slack_canal_notificacao'])) {
+            if (!$config || empty($config['slack_token'])) {
                 return false;
             }
 
             $token = $config['slack_token'];
-            $canal = $config['slack_canal_notificacao'];
+            
+            if ($destinatariosManual !== null) {
+                $destinatarios = is_array($destinatariosManual) ? $destinatariosManual : obterDestinatariosSlack($destinatariosManual);
+            } else {
+                $destinatarios = obterDestinatariosSlack($config['slack_canal_notificacao'] ?? '');
+            }
 
-            $ch = curl_init("https://slack.com/api/chat.postMessage");
+            if (empty($destinatarios)) {
+                return false;
+            }
+
+            $sucessos = 0;
+            foreach ($destinatarios as $dest) {
+                $ch = curl_init("https://slack.com/api/chat.postMessage");
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_POST, true);
+                curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                    "Authorization: Bearer " . $token,
+                    "Content-Type: application/json; charset=utf-8"
+                ]);
+                curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
+                    "channel" => $dest,
+                    "text" => $mensagem
+                ]));
+                $resRaw = curl_exec($ch);
+                curl_close($ch);
+
+                $resJson = json_decode($resRaw, true);
+                if ($resJson && isset($resJson['ok']) && $resJson['ok']) {
+                    $sucessos++;
+                } else {
+                    $erroMsg = $resJson['error'] ?? 'desconhecido';
+                    error_log("Erro Slack postMessage para '{$dest}': {$erroMsg}");
+                }
+            }
+
+            return ($sucessos > 0);
+        } catch (Exception $e) {
+            error_log("Exceção em enviarNotificacaoSlack: " . $e->getMessage());
+            return false;
+        }
+    }
+}
+
+if (!function_exists('testarNotificacaoSlack')) {
+    /**
+     * Realiza um teste de envio de alerta para todos os destinatários cadastrados e detalha os resultados
+     */
+    function testarNotificacaoSlack($pdo, $mensagemTeste = null) {
+        try {
+            $stmtConf = $pdo->query("SELECT slack_token, slack_canal_notificacao FROM configuracoes LIMIT 1");
+            $config = $stmtConf->fetch();
+            if (!$config || empty($config['slack_token'])) {
+                return [
+                    'sucesso' => false,
+                    'mensagem' => 'Token do Slack não está configurado.',
+                    'total' => 0,
+                    'enviados' => 0,
+                    'falhas' => 0,
+                    'detalhes' => []
+                ];
+            }
+
+            $token = $config['slack_token'];
+            $destinatarios = obterDestinatariosSlack($config['slack_canal_notificacao'] ?? '');
+
+            if (empty($destinatarios)) {
+                return [
+                    'sucesso' => false,
+                    'mensagem' => 'Nenhum destinatário (canal ou ID de membro) configurado.',
+                    'total' => 0,
+                    'enviados' => 0,
+                    'falhas' => 0,
+                    'detalhes' => []
+                ];
+            }
+
+            if (empty($mensagemTeste)) {
+                $agora = date('d/m/Y H:i:s');
+                $mensagemTeste = "🧪 *Teste de Alerta do Bot Slack*\n"
+                    . "Esta é uma mensagem de teste enviada pelo sistema de Gestão de Contas & Apps em *{$agora}*.\n"
+                    . "Se você recebeu este alerta, suas notificações dos aplicativos estão ativas e funcionando perfeitamente! 🚀";
+            }
+
+            $detalhes = [];
+            $enviados = 0;
+            $falhas = 0;
+
+            foreach ($destinatarios as $dest) {
+                $ch = curl_init("https://slack.com/api/chat.postMessage");
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_POST, true);
+                curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                    "Authorization: Bearer " . $token,
+                    "Content-Type: application/json; charset=utf-8"
+                ]);
+                curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
+                    "channel" => $dest,
+                    "text" => $mensagemTeste
+                ]));
+                $resRaw = curl_exec($ch);
+                curl_close($ch);
+
+                $resJson = json_decode($resRaw, true);
+                if ($resJson && isset($resJson['ok']) && $resJson['ok']) {
+                    $enviados++;
+                    $detalhes[] = [
+                        'destinatario' => $dest,
+                        'ok' => true,
+                        'ts' => $resJson['ts'] ?? null
+                    ];
+                } else {
+                    $falhas++;
+                    $erroMsg = $resJson['error'] ?? 'Erro desconhecido na API do Slack';
+                    $detalhes[] = [
+                        'destinatario' => $dest,
+                        'ok' => false,
+                        'erro' => $erroMsg
+                    ];
+                }
+            }
+
+            return [
+                'sucesso' => ($enviados > 0),
+                'mensagem' => "Envio concluído: {$enviados} enviado(s), {$falhas} falha(s).",
+                'total' => count($destinatarios),
+                'enviados' => $enviados,
+                'falhas' => $falhas,
+                'detalhes' => $detalhes
+            ];
+        } catch (Exception $e) {
+            return [
+                'sucesso' => false,
+                'mensagem' => 'Erro interno ao disparar teste: ' . $e->getMessage(),
+                'total' => 0,
+                'enviados' => 0,
+                'falhas' => 0,
+                'detalhes' => []
+            ];
+        }
+    }
+}
+
+if (!function_exists('obterMembrosSlackWorkspace')) {
+    /**
+     * Tenta buscar membros do workspace via users.list (se o token tiver permissão users:read)
+     */
+    function obterMembrosSlackWorkspace($token) {
+        if (empty($token)) return [];
+        try {
+            $ch = curl_init("https://slack.com/api/users.list");
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_POST, true);
             curl_setopt($ch, CURLOPT_HTTPHEADER, [
                 "Authorization: Bearer " . $token,
                 "Content-Type: application/json; charset=utf-8"
             ]);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
-                "channel" => $canal,
-                "text" => $mensagem
-            ]));
             $resRaw = curl_exec($ch);
             curl_close($ch);
-
             $resJson = json_decode($resRaw, true);
-            return ($resJson && isset($resJson['ok']) && $resJson['ok']);
+
+            if ($resJson && isset($resJson['ok']) && $resJson['ok'] && isset($resJson['members'])) {
+                $membros = [];
+                foreach ($resJson['members'] as $m) {
+                    if (!empty($m['deleted']) || !empty($m['is_bot']) || ($m['id'] ?? '') === 'USLACKBOT') {
+                        continue;
+                    }
+                    $membros[] = [
+                        'id' => $m['id'],
+                        'name' => $m['name'] ?? '',
+                        'real_name' => $m['real_name'] ?? ($m['profile']['real_name'] ?? $m['name']),
+                        'display_name' => $m['profile']['display_name'] ?? '',
+                        'avatar' => $m['profile']['image_48'] ?? ''
+                    ];
+                }
+                return $membros;
+            }
+            return [];
         } catch (Exception $e) {
-            return false;
+            return [];
         }
     }
 }

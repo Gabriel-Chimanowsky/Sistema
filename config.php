@@ -141,35 +141,69 @@ $config = $stmt->fetch();
                 </div>
             </div>
 
-            <!-- Nova Seção: Integração Slack -->
+            <!-- Nova Seção: Integração Slack & Alertas -->
             <div class="border-t pt-10 dark:border-slate-800 grid grid-cols-1 md:grid-cols-2 gap-10">
                 <div class="space-y-6">
-                    <h3 class="text-xs font-black uppercase tracking-[0.2em] text-slate-400 border-b pb-2 dark:border-slate-800">Integração Slack Lists</h3>
+                    <div class="flex items-center justify-between border-b pb-2 dark:border-slate-800">
+                        <h3 class="text-xs font-black uppercase tracking-[0.2em] text-slate-400">Integração Slack & Alertas</h3>
+                        <a href="slack.php" class="text-xs font-bold text-blue-500 hover:underline flex items-center gap-1">
+                            <i data-lucide="external-link" class="w-3.5 h-3.5"></i> Abrir Painel Slack
+                        </a>
+                    </div>
                     
                     <div class="space-y-2">
                         <label class="block text-sm font-bold text-slate-500 uppercase tracking-wider ml-1">Token do Slack (Bot OAuth Token)</label>
-                        <input type="text" name="slack_token" value="<?= htmlspecialchars($config['slack_token'] ?? '') ?>" 
+                        <input type="text" id="slack_token_input" name="slack_token" value="<?= htmlspecialchars($config['slack_token'] ?? '') ?>" 
                             class="w-full bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-blue-500 p-4 rounded-2xl outline-none transition-all font-bold font-mono" placeholder="xoxb-...">
                     </div>
 
                     <div class="space-y-2">
-                        <label class="block text-sm font-bold text-slate-500 uppercase tracking-wider ml-1">Canal / ID de Conversa para Notificações</label>
-                        <input type="text" name="slack_canal_notificacao" value="<?= htmlspecialchars($config['slack_canal_notificacao'] ?? '') ?>" 
-                            class="w-full bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-blue-500 p-4 rounded-2xl outline-none transition-all font-bold" placeholder="Ex: C0123456789 ou #geral">
+                        <div class="flex items-center justify-between">
+                            <label class="block text-sm font-bold text-slate-500 uppercase tracking-wider ml-1">Destinatários dos Alertas dos Apps & Listas</label>
+                            <span id="destinatariosCount" class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300">0 pessoa(s)/canal(is)</span>
+                        </div>
+                        <textarea id="slack_canal_notificacao" name="slack_canal_notificacao" rows="3" oninput="atualizarPreviewDestinatarios()"
+                            class="w-full bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-blue-500 p-4 rounded-2xl outline-none transition-all font-bold font-mono text-sm leading-relaxed" 
+                            placeholder="Ex: U0123456789, U0987654321, #alertas, C0123456789"><?= htmlspecialchars($config['slack_canal_notificacao'] ?? '') ?></textarea>
+                        
+                        <!-- Badges preview dos destinatários -->
+                        <div id="destinatariosPreviewContainer" class="flex flex-wrap gap-1.5 pt-1"></div>
+                    </div>
+
+                    <!-- Botão Disparar Alerta de Teste -->
+                    <div class="pt-2">
+                        <button type="button" id="btnTestarSlack" onclick="testarEnvioAlertaSlack()" 
+                            class="w-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold py-3 px-5 rounded-2xl transition active:scale-95 flex items-center justify-center gap-2 text-xs cursor-pointer border border-slate-200 dark:border-slate-700 shadow-sm">
+                            <i data-lucide="send" id="iconTestarSlack" class="w-4 h-4 text-purple-600 dark:text-purple-400"></i>
+                            <span id="textoTestarSlack">Disparar Alerta de Teste para Todos</span>
+                        </button>
+                        <div id="resultadoTesteSlack" class="hidden mt-3 p-3 rounded-2xl text-xs font-semibold space-y-1"></div>
                     </div>
                 </div>
 
-                <div class="space-y-6 flex flex-col justify-end">
-                    <div class="bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/50 p-6 rounded-3xl text-xs space-y-3">
-                        <div class="font-bold text-blue-800 dark:text-blue-400 flex items-center gap-2">
-                            <i data-lucide="info" class="w-4 h-4"></i>
-                            Sobre a Automação do Slack
+                <div class="space-y-6 flex flex-col justify-start">
+                    <div class="bg-purple-50 dark:bg-purple-950/20 border border-purple-100 dark:border-purple-900/50 p-6 rounded-3xl text-xs space-y-3">
+                        <div class="font-bold text-purple-800 dark:text-purple-400 flex items-center gap-2">
+                            <i data-lucide="users" class="w-4 h-4"></i>
+                            Como Adicionar Múltiplas Pessoas no Slack
                         </div>
                         <p class="text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
-                            O bot criará automaticamente uma lista de tarefas no Slack a cada mês. O link para a nova lista do mês será enviado no canal especificado acima.
+                            Agora o sistema suporta <strong>múltiplos destinatários</strong> para os alertas de aplicativos (queda de app, retorno online e aprovações no Meta).
                         </p>
-                        <p class="text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
-                            Certifique-se de que o Bot foi adicionado ao canal desejado no Slack digitando <code class="bg-blue-100/60 dark:bg-blue-900/40 px-1 py-0.5 rounded font-bold font-mono text-[11px]">/invite @Bot</code> no chat.
+                        <div class="bg-white/80 dark:bg-slate-900/80 p-3.5 rounded-xl border border-purple-200/50 dark:border-purple-800/40 space-y-2">
+                            <div class="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                                <i data-lucide="user-plus" class="w-3.5 h-3.5 text-purple-600"></i>
+                                Para pegar o ID de uma pessoa no Slack:
+                            </div>
+                            <ol class="list-decimal list-inside space-y-1 text-slate-600 dark:text-slate-400 text-[11px]">
+                                <li>Abra o Slack e clique na foto/perfil da pessoa.</li>
+                                <li>Clique no botão de <strong>três pontinhos (...)</strong> ao lado da mensagem.</li>
+                                <li>Clique em <strong>"Copiar ID do membro"</strong> (ex: <code class="font-mono bg-purple-100 dark:bg-purple-950 px-1 py-0.5 rounded font-bold">U08ABCDEF12</code>).</li>
+                                <li>Cole no campo ao lado separando por <strong>vírgula</strong> ou quebra de linha.</li>
+                            </ol>
+                        </div>
+                        <p class="text-slate-600 dark:text-slate-400 leading-relaxed font-medium text-[11px]">
+                            💡 Se quiser que o bot mande para um canal em grupo, basta colocar o ID do canal (ex: <code class="font-mono bg-purple-100 dark:bg-purple-950 px-1 py-0.5 rounded font-bold">C0123456789</code>) ou o nome com # (ex: <code class="font-mono bg-purple-100 dark:bg-purple-950 px-1 py-0.5 rounded font-bold">#geral</code>) e certificar-se de ter feito <code class="font-mono bg-purple-100 dark:bg-purple-950 px-1 py-0.5 rounded font-bold">/invite @Bot</code> no canal.
                         </p>
                     </div>
                 </div>
@@ -233,10 +267,163 @@ $config = $stmt->fetch();
 
     <!-- Toast Notification -->
     <div id="toast" class="fixed bottom-24 right-8 bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-6 py-4 rounded-2xl shadow-2xl font-bold flex items-center gap-3 transform translate-y-32 opacity-0 transition-all z-50">
-        <div class="w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center text-white"><i data-lucide="check" class="w-4 h-4"></i></div>
+        <div id="toastIcon" class="w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center text-white"><i data-lucide="check" class="w-4 h-4"></i></div>
         <span id="toastMsg"></span>
     </div>
 
-    <script>lucide.createIcons();</script>
+    <script>
+        function showCustomToast(msg, isError = false) {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toastMsg');
+            const toastIcon = document.getElementById('toastIcon');
+            
+            toastMsg.textContent = msg;
+            if (isError) {
+                toastIcon.className = 'w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white';
+                toastIcon.innerHTML = '<i data-lucide="x" class="w-4 h-4"></i>';
+            } else {
+                toastIcon.className = 'w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center text-white';
+                toastIcon.innerHTML = '<i data-lucide="check" class="w-4 h-4"></i>';
+            }
+            lucide.createIcons();
+            
+            toast.classList.remove('translate-y-32', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-32', 'opacity-0');
+            }, 4000);
+        }
+
+        function extrairDestinatarios(str) {
+            if (!str) return [];
+            return str.split(/[\r\n,;\s]+/)
+                .map(s => s.trim().replace(/^["']|["']$/g, ''))
+                .filter(s => s.length > 0)
+                .filter((val, idx, arr) => arr.indexOf(val) === idx);
+        }
+
+        function atualizarPreviewDestinatarios() {
+            const val = document.getElementById('slack_canal_notificacao')?.value || '';
+            const lista = extrairDestinatarios(val);
+            const countElem = document.getElementById('destinatariosCount');
+            const container = document.getElementById('destinatariosPreviewContainer');
+
+            if (countElem) {
+                countElem.textContent = `${lista.length} pessoa(s)/canal(is)`;
+            }
+
+            if (!container) return;
+            container.innerHTML = '';
+
+            lista.forEach(dest => {
+                const badge = document.createElement('span');
+                const isUser = dest.startsWith('U') || dest.startsWith('W');
+                const isChannel = dest.startsWith('C') || dest.startsWith('#') || dest.startsWith('G');
+                
+                let icon = isUser ? '👤' : (isChannel ? '💬' : '📍');
+                let colorClass = isUser 
+                    ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 border-blue-200 dark:border-blue-900' 
+                    : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900';
+
+                badge.className = `inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-mono font-bold border shadow-xs ${colorClass}`;
+                badge.innerHTML = `<span>${icon}</span> <span>${dest}</span>`;
+                container.appendChild(badge);
+            });
+        }
+
+        async function testarEnvioAlertaSlack() {
+            const btn = document.getElementById('btnTestarSlack');
+            const texto = document.getElementById('textoTestarSlack');
+            const icon = document.getElementById('iconTestarSlack');
+            const resultado = document.getElementById('resultadoTesteSlack');
+            const token = document.getElementById('slack_token_input')?.value.trim() || '';
+            const destinatarios = document.getElementById('slack_canal_notificacao')?.value.trim() || '';
+
+            if (!token) {
+                showCustomToast('Preencha o Token do Slack primeiro.', true);
+                return;
+            }
+
+            const destList = extrairDestinatarios(destinatarios);
+            if (destList.length === 0) {
+                showCustomToast('Adicione pelo menos 1 destinatário (ID de usuário ou canal).', true);
+                return;
+            }
+
+            btn.disabled = true;
+            btn.classList.add('opacity-70', 'cursor-not-allowed');
+            texto.textContent = `Enviando para ${destList.length} destinatário(s)...`;
+            icon.setAttribute('data-lucide', 'loader');
+            icon.classList.add('animate-spin');
+            lucide.createIcons();
+
+            resultado.classList.add('hidden');
+            resultado.innerHTML = '';
+
+            try {
+                const formData = new FormData();
+                formData.append('acao', 'testar_slack_alerta');
+                formData.append('token', token);
+                formData.append('destinatarios', destinatarios);
+
+                const resp = await fetch('processa.php', {
+                    method: 'POST',
+                    body: formData
+                });
+                const dados = await resp.json();
+
+                resultado.classList.remove('hidden');
+
+                if (dados.sucesso) {
+                    resultado.className = 'mt-3 p-3 rounded-2xl text-xs font-semibold space-y-1.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900';
+                    let html = `<div class="flex items-center gap-2 font-bold"><i data-lucide="check-circle" class="w-4 h-4 text-emerald-500"></i> ${dados.mensagem}</div>`;
+                    
+                    if (dados.detalhes && dados.detalhes.length > 0) {
+                        html += '<div class="pt-1 text-[11px] space-y-1">';
+                        dados.detalhes.forEach(d => {
+                            if (d.ok) {
+                                html += `<div class="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400">✅ <strong>${d.destinatario}</strong>: Recebido com sucesso!</div>`;
+                            } else {
+                                html += `<div class="flex items-center gap-1.5 text-red-600 dark:text-red-400">❌ <strong>${d.destinatario}</strong>: Falha (${d.erro})</div>`;
+                            }
+                        });
+                        html += '</div>';
+                    }
+                    resultado.innerHTML = html;
+                    showCustomToast(`Alerta de teste enviado com sucesso! (${dados.enviados}/${dados.total})`);
+                } else {
+                    resultado.className = 'mt-3 p-3 rounded-2xl text-xs font-semibold space-y-1.5 bg-red-50 dark:bg-red-950/40 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-900';
+                    let html = `<div class="flex items-center gap-2 font-bold"><i data-lucide="alert-circle" class="w-4 h-4 text-red-500"></i> ${dados.mensagem || 'Erro no envio do teste.'}</div>`;
+                    if (dados.detalhes && dados.detalhes.length > 0) {
+                        html += '<div class="pt-1 text-[11px] space-y-1">';
+                        dados.detalhes.forEach(d => {
+                            html += `<div class="flex items-center gap-1.5 text-red-600 dark:text-red-400">❌ <strong>${d.destinatario}</strong>: ${d.erro || 'Erro'}</div>`;
+                        });
+                        html += '</div>';
+                    }
+                    resultado.innerHTML = html;
+                    showCustomToast('Falha ao enviar alerta de teste.', true);
+                }
+            } catch (err) {
+                resultado.classList.remove('hidden');
+                resultado.className = 'mt-3 p-3 rounded-2xl text-xs font-semibold bg-red-50 dark:bg-red-950/40 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-900';
+                resultado.textContent = 'Erro ao conectar ao servidor: ' + err.message;
+                showCustomToast('Erro de comunicação.', true);
+            } finally {
+                btn.disabled = false;
+                btn.classList.remove('opacity-70', 'cursor-not-allowed');
+                texto.textContent = 'Disparar Alerta de Teste para Todos';
+                icon.setAttribute('data-lucide', 'send');
+                icon.classList.remove('animate-spin');
+                lucide.createIcons();
+            }
+        }
+
+        // Executar inicialização do preview
+        document.addEventListener('DOMContentLoaded', () => {
+            atualizarPreviewDestinatarios();
+        });
+        atualizarPreviewDestinatarios();
+        lucide.createIcons();
+    </script>
 </body>
 </html>
